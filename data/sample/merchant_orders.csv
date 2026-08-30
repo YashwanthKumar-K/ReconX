@@ -1,0 +1,51 @@
+order_id,customer_name,amount,order_date,status,product
+ORD_1001,Divya Kulkarni,1171.32,2026-08-20 20:43:00,completed,Desk Lamp
+ORD_1002,Manish Tiwari,1571.04,2026-08-21 23:57:00,completed,Sunglasses
+ORD_1003,Divya Kulkarni,279.71,2026-08-21 07:34:00,completed,Notebook Set
+ORD_1004,Amit Kumar,1226.31,2026-08-21 00:55:00,completed,Desk Lamp
+ORD_1005,Anjali Saxena,1512.5,2026-08-21 00:10:00,completed,Standing Desk Mat
+ORD_1006,Amit Kumar,339.12,2026-08-20 23:58:00,completed,Mouse Pad
+ORD_1007,Manish Tiwari,3475.27,2026-08-21 06:57:00,completed,Webcam
+ORD_1008,Karthik Sundaram,1455.35,2026-08-21 07:33:00,completed,Standing Desk Mat
+ORD_1009,Nikhil Agarwal,192.48,2026-08-21 17:46:00,completed,USB Cable
+ORD_1010,Aakash Jain,1802.94,2026-08-21 17:38:00,completed,Backpack
+ORD_1011,Amit Kumar,1522.19,2026-08-21 21:08:00,completed,Wireless Earbuds
+ORD_1012,Gaurav Malhotra,498.51,2026-08-22 04:28:00,completed,Coffee Mug
+ORD_1013,Priya Patel,1155.74,2026-08-22 03:04:00,completed,Desk Lamp
+ORD_1014,Shreya Bhat,358.43,2026-08-22 06:22:00,completed,Water Bottle
+ORD_1015,Anjali Saxena,1168.16,2026-08-22 07:08:00,completed,Desk Lamp
+ORD_1016,Aakash Jain,545.9,2026-08-23 00:10:00,completed,Blue T-Shirt
+ORD_1017,Divya Kulkarni,191.3,2026-08-23 08:09:00,completed,USB Cable
+ORD_1018,Suresh Pillai,1754.69,2026-08-22 19:54:00,completed,Backpack
+ORD_1019,Manish Tiwari,1614.74,2026-08-23 03:59:00,completed,Sunglasses
+ORD_1020,Manish Tiwari,494.83,2026-08-22 20:04:00,completed,Blue T-Shirt
+ORD_1021,Gaurav Malhotra,1547.39,2026-08-22 17:42:00,completed,Standing Desk Mat
+ORD_1022,Rohit Joshi,420.76,2026-08-23 01:32:00,completed,Water Bottle
+ORD_1023,Anjali Saxena,1823.12,2026-08-24 06:35:00,completed,Backpack
+ORD_1024,Priya Patel,185.47,2026-08-24 04:13:00,completed,USB Cable
+ORD_1025,Rahul Sharma,1837.14,2026-08-23 22:47:00,completed,Backpack
+ORD_1026,Nikhil Agarwal,1271.24,2026-08-24 04:19:00,completed,Power Bank
+ORD_1027,Sneha Gupta,392.92,2026-08-24 01:11:00,completed,Mouse Pad
+ORD_1028,Priya Patel,1868.01,2026-08-24 06:00:00,completed,Monitor Light
+ORD_1029,Sneha Gupta,1480.39,2026-08-24 02:32:00,completed,Standing Desk Mat
+ORD_1030,Karthik Sundaram,1505.91,2026-08-24 17:19:00,completed,Standing Desk Mat
+ORD_1031,Shreya Bhat,1477.38,2026-08-25 03:05:00,completed,Wireless Earbuds
+ORD_1032,Rajesh Menon,1868.44,2026-08-25 05:31:00,completed,Monitor Light
+ORD_1033,Kavita Nair,654.02,2026-08-24 20:29:00,completed,Watch Strap
+ORD_1034,Anjali Saxena,1632.06,2026-08-25 07:57:00,completed,Sunglasses
+ORD_1035,Deepika Rao,656.75,2026-08-25 00:17:00,completed,Watch Strap
+ORD_1036,Rohit Joshi,690.58,2026-08-25 06:24:00,completed,Watch Strap
+ORD_1037,Anjali Saxena,3523.75,2026-08-26 00:31:00,completed,Webcam
+ORD_1038,Karthik Sundaram,3451.7,2026-08-25 17:05:00,completed,Webcam
+ORD_1039,Ritu Bansal,282.49,2026-08-25 17:47:00,completed,Notebook Set
+ORD_1040,Vikram Singh,1464.24,2026-08-26 08:42:00,completed,Standing Desk Mat
+ORD_1041,Rahul Sharma,159.81,2026-08-26 02:36:00,completed,USB Cable
+ORD_1042,Ritu Bansal,533.96,2026-08-25 20:27:00,completed,Blue T-Shirt
+ORD_1043,Divya Kulkarni,1295.49,2026-08-26 01:20:00,completed,Power Bank
+ORD_1044,Meera Iyer,1797.75,2026-08-27 01:21:00,completed,Backpack
+ORD_1045,Ritu Bansal,1313.59,2026-08-27 07:50:00,completed,Power Bank
+ORD_1046,Nikhil Agarwal,334.18,2026-08-27 01:19:00,completed,Mouse Pad
+ORD_1047,Suresh Pillai,1946.66,2026-08-27 02:06:00,completed,Monitor Light
+ORD_1048,Rahul Sharma,1259.26,2026-08-27 02:30:00,completed,Power Bank
+ORD_1049,Ananya Reddy,1293.05,2026-08-26 18:16:00,completed,Power Bank
+ORD_1050,Aakash Jain,1160.85,2026-08-27 06:38:00,completed,Desk Lamp
