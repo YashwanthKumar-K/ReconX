@@ -131,11 +131,12 @@ def run_reconciliation(
     if verbose:
         print("\n[5/5] Phase 4: AI Anomaly Investigation...")
 
-    # Collect all anomalies for AI investigation
+    # Collect all anomalies for AI investigation.
+    # SETTLEMENT_MISMATCH and ORPHAN_DEPOSIT are excluded here —
+    # Phase 3 re-adds them via p3_still_unmatched if genuinely unresolved.
     all_anomalies = p1_anomalies + [
         a for a in p2_anomalies
         if a["anomaly_type"] not in ("SETTLEMENT_MISMATCH", "ORPHAN_DEPOSIT")
-        or a.get("order_id", "").startswith("SETTLEMENT_")  # keep settlement-level ones
     ]
 
     # Add back unmatched from Phase 3 as anomalies
@@ -182,19 +183,28 @@ def run_reconciliation(
         print(f"  Needs manual review: {p4_stats['remaining_count']}")
 
     # ─── Scoring ──────────────────────────────────────────────────────────
-    if verbose:
-        print("\n[SCORING] Evaluating against ground truth...")
-
     matched_order_ids = set(m["order_id"] for m in p1_matched)
-    scores = score_results(enriched_anomalies, ground_truth_df, matched_order_ids)
-
-    if verbose:
-        print(f"  Engine detection accuracy: {scores['engine_accuracy']}%")
-        print(f"  AI classification accuracy: {scores['ai_accuracy']}% ({scores['ai_correct']}/{scores['ai_total']})")
-        if scores["undetected_anomalies"]:
-            print(f"  Undetected anomalies: {len(scores['undetected_anomalies'])}")
-            for u in scores["undetected_anomalies"]:
-                print(f"    - {u['order_id']}: {u['missed_anomaly_type']}")
+    if ground_truth_df is not None:
+        if verbose:
+            print("\n[SCORING] Evaluating against ground truth...")
+        scores = score_results(enriched_anomalies, ground_truth_df, matched_order_ids)
+        if verbose:
+            print(f"  Engine detection accuracy: {scores['engine_accuracy']}%")
+            print(f"  AI classification accuracy: {scores['ai_accuracy']}% ({scores['ai_correct']}/{scores['ai_total']})")
+            if scores["undetected_anomalies"]:
+                print(f"  Undetected anomalies: {len(scores['undetected_anomalies'])}")
+                for u in scores["undetected_anomalies"]:
+                    print(f"    - {u['order_id']}: {u['missed_anomaly_type']}")
+    else:
+        # No ground truth available (user-uploaded data) -- skip scoring
+        scores = {
+            "engine_accuracy": None,
+            "ai_accuracy": None,
+            "ai_correct": 0,
+            "ai_total": 0,
+            "undetected_anomalies": [],
+            "confusion_matrix": {},
+        }
 
     elapsed = round(time.time() - start_time, 2)
 

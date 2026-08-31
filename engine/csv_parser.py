@@ -52,15 +52,16 @@ def parse_ground_truth(path: str) -> pd.DataFrame:
 
 def load_all_data(data_dir: str) -> dict:
     """
-    Load all 4 CSVs from a directory.
+    Load CSVs from a directory. ground_truth.csv is optional.
 
     Returns:
-        Dict with keys: merchant, razorpay, bank, ground_truth — each a DataFrame.
+        Dict with keys: merchant, razorpay, bank, ground_truth (None if missing).
     """
     data_dir = Path(data_dir)
+    gt_path = data_dir / "ground_truth.csv"
     return {
         "merchant": parse_merchant_orders(str(data_dir / "merchant_orders.csv")),
         "razorpay": parse_razorpay_transactions(str(data_dir / "razorpay_transactions.csv")),
         "bank": parse_bank_statement(str(data_dir / "bank_statement.csv")),
-        "ground_truth": parse_ground_truth(str(data_dir / "ground_truth.csv")),
+        "ground_truth": parse_ground_truth(str(gt_path)) if gt_path.exists() else None,
     }

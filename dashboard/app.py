@@ -150,44 +150,75 @@ if uploaded_files and len(uploaded_files) >= 3:
             out.write(f.getbuffer())
     data_dir = upload_dir
     st.session_state.data_dir = data_dir
+    st.success(f"Loaded {len(uploaded_files)} files! Click RECONCILE below.")
 
 if data_dir or "data_dir" in st.session_state:
     active_dir = data_dir or st.session_state.get("data_dir")
 
     # ─── Reconcile Button ────────────────────────────────────────────
-    col_r1, col_r2 = st.columns([3, 1])
+    col_r1, col_r2, col_r3 = st.columns([2, 2, 1])
     with col_r1:
         use_ai = st.checkbox("Enable AI Investigation (Phase 4)", value=True,
-                             help="Requires GEMINI_API_KEY in .env file")
+                             help="Uses Groq (Llama3) or Gemini to explain each anomaly")
     with col_r2:
-        reconcile_btn = st.button("⚡ RECONCILE", type="primary", use_container_width=True)
+        cache_path = os.path.join(active_dir, "cached_ai_results.json")
+        has_cache = os.path.exists(cache_path)
+        use_cache = st.checkbox(
+            "Use Cached AI Results (Demo Mode)",
+            value=has_cache,
+            disabled=not has_cache,
+            help="Load pre-computed AI results instantly. Run once with Live AI to build the cache."
+        )
+    with col_r3:
+        reconcile_btn = st.button("RECONCILE", type="primary", use_container_width=True)
 
     if reconcile_btn:
         st.session_state.running = True
 
-        # Phase-by-phase progress display
         progress_bar = st.progress(0, text="Starting reconciliation...")
 
         from engine.reconciliation_engine import run_reconciliation
 
-        # Run the pipeline
-        progress_bar.progress(10, text="Loading data...")
-        time.sleep(0.3)
-        progress_bar.progress(25, text="Phase 1: Direct Key Matching...")
-        time.sleep(0.2)
+        # Step 1: Deterministic matching (instant ~0.03s)
+        progress_bar.progress(10, text="Phase 1-3: Running deterministic matching...")
+        report = run_reconciliation(data_dir=active_dir, use_ai=False, verbose=False)
+        progress_bar.progress(50, text="Deterministic matching complete!")
 
-        report = run_reconciliation(
-            data_dir=active_dir,
-            use_ai=use_ai,
-            verbose=False,
-        )
+        # Step 2: AI investigation
+        if use_ai and report.get("anomalies"):
+            from engine.ai_investigator import investigate_batch, load_ai_cache, save_ai_cache
+            from engine.scorer import score_results
+            from engine.csv_parser import parse_ground_truth
+            from pathlib import Path
+            import time as _time
 
-        progress_bar.progress(60, text="Phase 2: Settlement Batch Matching...")
-        time.sleep(0.2)
-        progress_bar.progress(75, text="Phase 3: Subset-Sum Matching...")
-        time.sleep(0.2)
-        progress_bar.progress(90, text="Phase 4: AI Investigation...")
-        time.sleep(0.2)
+            anomalies = report["anomalies"]
+
+            if use_cache and has_cache:
+                # Fix 2: Load from cache -- instant, zero API calls
+                progress_bar.progress(90, text="Loading cached AI results...")
+                enriched = load_ai_cache(anomalies, cache_path)
+            else:
+                # Live AI call -- batch all anomalies in ONE request (Fix 1)
+                def on_progress(current, total, message):
+                    pct = 50 + int((current / max(total, 1)) * 40)
+                    progress_bar.progress(pct, text=f"AI: {message}")
+
+                enriched = investigate_batch(anomalies, progress_callback=on_progress)
+                # Save cache for future demo runs (Fix 2)
+                save_ai_cache(enriched, cache_path)
+                st.toast("AI results cached for next run!", icon="💾")
+
+            report["anomalies"] = enriched
+
+            # Re-score with AI results
+            gt_path = Path(active_dir) / "ground_truth.csv"
+            if gt_path.exists():
+                gt_df = parse_ground_truth(str(gt_path))
+                matched_ids = set(m["order_id"] for m in report.get("matched_results", []))
+                scores = score_results(enriched, gt_df, matched_ids)
+                report["scores"] = scores
+
         progress_bar.progress(100, text="Complete!")
         time.sleep(0.3)
         progress_bar.empty()
@@ -216,11 +247,14 @@ if st.session_state.report is not None:
         st.metric("Anomalies", report["total_anomalies"])
     with c4:
         engine_acc = report["scores"]["engine_accuracy"]
-        st.metric("Engine Accuracy", f"{engine_acc}%")
+        st.metric("Engine Accuracy", f"{engine_acc}%" if engine_acc is not None else "N/A",
+                  help="Only available when ground_truth.csv is present")
     with c5:
         ai_acc = report["scores"]["ai_accuracy"]
-        st.metric("AI Accuracy", f"{ai_acc}%",
-                   delta=f"{report['scores']['ai_correct']}/{report['scores']['ai_total']}")
+        ai_label = f"{ai_acc}%" if ai_acc is not None else "N/A"
+        ai_delta = f"{report['scores']['ai_correct']}/{report['scores']['ai_total']}" if ai_acc is not None else None
+        st.metric("AI Accuracy", ai_label, delta=ai_delta,
+                  help="Only available when ground_truth.csv is present")
 
     st.markdown("---")
 
@@ -234,17 +268,26 @@ if st.session_state.report is not None:
     ])
 
     with tab_funnel:
-        st.markdown("### Reconciliation Funnel — How Many Matched at Each Phase")
+        st.markdown("### Reconciliation Funnel — Orders resolved at each phase")
 
         phase_stats = report["phase_stats"]
+        total_orders = report["total_merchant_orders"]
 
-        # Funnel chart
+        # Compute order-level counts for each phase
+        p1_matched   = phase_stats[0]["matched_count"]   # orders matched directly
+        p1_anomalies = phase_stats[0]["anomaly_count"]   # orders flagged in Phase 1
+        p2_matched   = phase_stats[1].get("orders_resolved", 0)  # orders resolved via settlements
+        p3_matched   = phase_stats[2]["matched_count"]   # orders resolved via subset-sum
+        # Remaining anomalies = total - matched at any phase
+        resolved     = p1_matched + p2_matched + p3_matched
+        unresolved   = total_orders - resolved
+
         funnel_data = pd.DataFrame([
-            {"Phase": "Input Orders", "Count": report["total_merchant_orders"]},
-            {"Phase": "Phase 1: Matched", "Count": phase_stats[0]["matched_count"]},
-            {"Phase": "Phase 2: Settlements Matched", "Count": phase_stats[1]["matched_count"]},
-            {"Phase": "Phase 3: Subset Matches", "Count": phase_stats[2]["matched_count"]},
-            {"Phase": "Phase 4: AI Anomalies", "Count": phase_stats[3]["anomaly_count"]},
+            {"Phase": "Input Orders",             "Count": total_orders},
+            {"Phase": "Phase 1: Direct Match",    "Count": p1_matched},
+            {"Phase": "Phase 2: Settlement Match","Count": p1_matched + p2_matched},
+            {"Phase": "Phase 3: Subset-Sum Match","Count": p1_matched + p2_matched + p3_matched},
+            {"Phase": "Anomalies / Exceptions",   "Count": unresolved},
         ])
 
         fig_funnel = go.Figure(go.Funnel(
@@ -262,14 +305,27 @@ if st.session_state.report is not None:
         )
         st.plotly_chart(fig_funnel, use_container_width=True)
 
+        # Summary math sanity check
+        col_m, col_a = st.columns(2)
+        col_m.success(f"**Resolved:** {resolved} / {total_orders} orders ({round(resolved/total_orders*100,1)}%)")
+        col_a.error(f"**Exceptions:** {unresolved} / {total_orders} orders ({round(unresolved/total_orders*100,1)}%)")
+
         # Phase stats table
         st.markdown("#### Phase Details")
-        for ps in phase_stats:
-            col_a, col_b, col_c, col_d = st.columns(4)
-            col_a.write(f"**{ps['phase_name']}**")
-            col_b.write(f"Input: {ps['input_count']}")
-            col_c.write(f"Matched: {ps['matched_count']}")
-            col_d.write(f"Anomalies: {ps['anomaly_count']}")
+        st.markdown("""
+| Phase | What it counts | Input | Resolved | Anomalies flagged |
+|-------|---------------|-------|----------|-------------------|
+| Phase 1: Direct Key Matching | Orders matched by order_id | {} orders | {} orders | {} |
+| Phase 2: Settlement Batch Matching | Bank deposits matched to Razorpay settlements | {} settlements | {} settlements | {} |
+| Phase 3: Fuzzy/Subset-Sum Matching | Remaining settlements via graph matching | {} | {} | {} |
+| Phase 4: AI Investigation | Anomalies explained by AI | {} anomalies | — | {} investigated |
+""".format(
+            phase_stats[0]["input_count"], phase_stats[0]["matched_count"], phase_stats[0]["anomaly_count"],
+            phase_stats[1]["input_count"], phase_stats[1]["matched_count"], phase_stats[1]["anomaly_count"],
+            phase_stats[2]["input_count"], phase_stats[2]["matched_count"], phase_stats[2]["anomaly_count"],
+            phase_stats[3]["input_count"], phase_stats[3]["anomaly_count"],
+        ))
+
 
     with tab_matched:
         st.markdown("### Matched Transactions — 3-Way View")
