@@ -16,6 +16,19 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+
+def _get_secret(key: str, default: str = "") -> str:
+    """Read a secret from st.secrets (Streamlit Cloud) or os.getenv (local .env)."""
+    try:
+        import streamlit as st
+        val = st.secrets.get(key, "")
+        if val:
+            return val
+    except Exception:
+        pass
+    return os.getenv(key, default)
+
+
 # ─── Gemini Client Pool ───────────────────────────────────────────────────────
 
 _client_pool = []
@@ -29,7 +42,7 @@ def _init_client_pool():
         return
     try:
         from google import genai
-        raw_keys = os.getenv("GEMINI_API_KEY", "")
+        raw_keys = _get_secret("GEMINI_API_KEY")
         if not raw_keys or raw_keys.strip() == "your_gemini_api_key_here":
             return
         keys = [k.strip() for k in raw_keys.split(",") if k.strip()]
@@ -82,7 +95,7 @@ IMPORTANT:
 
 def _call_groq(prompt: str) -> Optional[str]:
     """Call Groq API using urllib (no extra dependencies). Returns raw text or None."""
-    groq_keys_raw = os.getenv("GROQ_API_KEY", "")
+    groq_keys_raw = _get_secret("GROQ_API_KEY")
     if not groq_keys_raw:
         return None
 
