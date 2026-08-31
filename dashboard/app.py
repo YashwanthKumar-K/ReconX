@@ -213,6 +213,8 @@ if data_dir or "data_dir" in st.session_state:
 
     if reconcile_btn:
         st.session_state.running = True
+        import time
+        start_time = time.time()
 
         progress_bar = st.progress(0, text="Starting reconciliation...")
 
@@ -261,6 +263,10 @@ if data_dir or "data_dir" in st.session_state:
         progress_bar.progress(100, text="Complete!")
         time.sleep(0.3)
         progress_bar.empty()
+
+        # Update total elapsed time to include AI Phase
+        total_time = round(time.time() - start_time, 2)
+        report["elapsed_seconds"] = total_time
 
         st.session_state.report = report
         st.session_state.running = False
