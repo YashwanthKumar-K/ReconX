@@ -86,6 +86,48 @@ python -m engine.reconciliation_engine data/sample
 streamlit run dashboard/app.py
 ```
 
+## Uploading Your Own Data (CSV Formats)
+
+If you want to upload your own datasets via the Streamlit dashboard, your CSV files **must exactly match** these column names and formats:
+
+### 1. `merchant_orders.csv`
+- `order_id` *(String)* — Unique identifier
+- `amount` *(Number)* — e.g. 1500.50
+- `order_date` *(Date/Time)*
+- `status` *(String)* — e.g. 'paid'
+
+### 2. `razorpay_transactions.csv`
+- `order_id` *(String)* — Matches merchant order
+- `payment_id` *(String)* — Unique payment ID
+- `settlement_id` *(String)* — Batch ID, e.g., `setl_XYZ`
+- `amount` *(Number)* — Gross amount
+- `fee` *(Number)* — Standard 2% fee
+- `tax` *(Number)* — 18% GST on the fee
+- `net_amount` *(Number)* — Amount minus fee and tax
+- `payment_date` *(Date/Time)*
+- `settlement_date` *(Date)*
+- `status` *(String)*
+
+### 3. `bank_statement.csv`
+- `utr_number` *(String)* — Bank reference
+- `deposit_amount` *(Number)* — Matches Razorpay settlement batch
+- `deposit_date` *(Date)*
+- `description` *(String)* — Text containing the `settlement_id`
+
+### 4. `ground_truth.csv` (Optional, for accuracy scoring)
+If you provide this file, the dashboard will score the engine and AI's accuracy automatically.
+- `order_id` *(String)*
+- `injected_anomaly_type` *(String)* — Must be one of:
+  - `NONE` (Clean transaction)
+  - `MISSING_RECORD` (In merchant, missing in Razorpay)
+  - `AMOUNT_DISCREPANCY` (Amount mismatch)
+  - `FEE_DISCREPANCY` (Razorpay charged the wrong fee rate)
+  - `DUPLICATE_PAYMENT` (Multiple payments for one order)
+  - `PARTIAL_REFUND` (Net amount is short due to a refund)
+  - `SPLIT_SETTLEMENT` (Order split across multiple bank deposits)
+  - `TIMING_MISMATCH` (Settled on wrong date)
+
+
 ## How Each Phase Works
 
 ### Phase 1: Direct Key Matching
