@@ -15,10 +15,11 @@ AI_TO_GROUND_TRUTH_MAP = {
     "PARTIAL_REFUND": "PARTIAL_REFUND",
     "SPLIT_SETTLEMENT": "SPLIT_SETTLEMENT",
     "DUPLICATE_PAYMENT": "DUPLICATE_PAYMENT",
-    "MISSING_RECORD": "MISSING_IN_RAZORPAY",
-    "MISSING_IN_RAZORPAY": "MISSING_IN_RAZORPAY",
+    "MISSING_RECORD": "MISSING_RECORD",          # external datasets use this label
+    "MISSING_IN_RAZORPAY": "MISSING_IN_RAZORPAY",  # our internal label
     "MISSING_IN_MERCHANT": "MISSING_IN_MERCHANT",
     "FEE_DISCREPANCY": "FEE_DISCREPANCY",
+    "AMOUNT_DISCREPANCY": "AMOUNT_DISCREPANCY",
     "REQUIRES_MANUAL_REVIEW": "REQUIRES_MANUAL_REVIEW",
 }
 
@@ -111,10 +112,11 @@ def score_results(
             continue  # Skip clean records that were wrongly flagged
 
         ai_total += 1
-        # Normalize the AI classification
+        # Normalize the AI classification (handle our internal name aliases)
         normalized_ai = AI_TO_GROUND_TRUTH_MAP.get(ai_class, ai_class)
 
-        is_correct = normalized_ai == gt_type
+        # Accept match on normalized name OR raw AI class (handles external GT label variations)
+        is_correct = (normalized_ai == gt_type) or (ai_class == gt_type)
         if is_correct:
             ai_correct += 1
 
