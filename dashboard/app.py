@@ -162,22 +162,31 @@ if uploaded_files and len(uploaded_files) >= 3:
     for f in uploaded_files:
         name_lower = f.name.lower()
         target_name = None
-        if "merchant" in name_lower or "order" in name_lower:
+        if "ground" in name_lower or "truth" in name_lower or "answer" in name_lower:
+            target_name = "ground_truth.csv"  # optional — enables accuracy scoring
+        elif "merchant" in name_lower or "order" in name_lower:
             target_name = "merchant_orders.csv"
         elif "razorpay" in name_lower or "transaction" in name_lower:
             target_name = "razorpay_transactions.csv"
         elif "bank" in name_lower or "statement" in name_lower:
             target_name = "bank_statement.csv"
-        
+
         if target_name:
             with open(os.path.join(upload_dir, target_name), "wb") as out:
                 out.write(f.getbuffer())
-            saved_count += 1
-            
+            if target_name != "ground_truth.csv":
+                saved_count += 1  # only count the 3 required ledger files
+
     if saved_count >= 3:
         data_dir = upload_dir
         st.session_state.data_dir = data_dir
-        st.success(f"Loaded and normalized 3 ledger files! Click RECONCILE below.")
+        has_gt = os.path.exists(os.path.join(upload_dir, "ground_truth.csv"))
+        msg = "Loaded and normalized 3 ledger files!"
+        if has_gt:
+            msg += " Ground truth detected — accuracy scoring enabled."
+        msg += " Click RECONCILE below."
+        st.success(msg)
+
     else:
         st.error("Could not identify the 3 required files. Please ensure names contain 'merchant', 'razorpay', and 'bank'.")
 
