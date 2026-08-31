@@ -44,7 +44,7 @@ ANOMALY_TYPES = [
     "PARTIAL_REFUND",
     "SPLIT_SETTLEMENT",
     "DUPLICATE_PAYMENT",
-    "MISSING_IN_RAZORPAY",
+    "MISSING_RECORD",
     "FEE_DISCREPANCY",
 ]
 
@@ -135,8 +135,8 @@ def generate_data(
 
         # ─── Handle anomalies ─────────────────────────────────────────
 
-        # MISSING_IN_RAZORPAY: merchant has order, Razorpay doesn't
-        if anomaly_type == "MISSING_IN_RAZORPAY":
+        # MISSING_RECORD: merchant has order, Razorpay doesn't
+        if anomaly_type == "MISSING_RECORD":
             continue  # skip creating Razorpay & bank records for this order
 
         # Calculate fees

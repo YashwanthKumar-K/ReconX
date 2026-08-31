@@ -48,7 +48,7 @@ def run_phase1(
             # Missing in Razorpay
             anomalies.append({
                 "order_id": order_id,
-                "anomaly_type": "MISSING_IN_RAZORPAY",
+                "anomaly_type": "MISSING_RECORD",
                 "detected_in_phase": "Phase 1: Direct Key Matching",
                 "merchant_data": {
                     "amount": float(m_row["amount"]),

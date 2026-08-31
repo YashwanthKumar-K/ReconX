@@ -16,7 +16,7 @@ AI_TO_GROUND_TRUTH_MAP = {
     "SPLIT_SETTLEMENT": "SPLIT_SETTLEMENT",
     "DUPLICATE_PAYMENT": "DUPLICATE_PAYMENT",
     "MISSING_RECORD": "MISSING_RECORD",          # external datasets use this label
-    "MISSING_IN_RAZORPAY": "MISSING_IN_RAZORPAY",  # our internal label
+    "MISSING_RECORD": "MISSING_RECORD",  # our internal label
     "MISSING_IN_MERCHANT": "MISSING_IN_MERCHANT",
     "FEE_DISCREPANCY": "FEE_DISCREPANCY",
     "AMOUNT_DISCREPANCY": "AMOUNT_DISCREPANCY",
@@ -104,10 +104,23 @@ def score_results(
         ai_class = a.get("ai_classification")
         if not ai_class:
             continue
-        if oid not in gt_dict:
-            continue
+            
+        # For split settlements, verify against any of its underlying orders
+        gt_type = "NONE"
+        if oid.startswith("SETTLEMENT_") or oid.startswith("BANK_"):
+            rz_data = a.get("razorpay_data", {})
+            if isinstance(rz_data, dict):
+                sub_order_ids = rz_data.get("order_ids", [])
+                for sub_oid in sub_order_ids:
+                    if sub_oid in gt_dict:
+                        gt_type = gt_dict[sub_oid]
+                        if gt_type != "NONE":
+                            break
+        else:
+            if oid not in gt_dict:
+                continue
+            gt_type = gt_dict[oid]
 
-        gt_type = gt_dict[oid]
         if gt_type == "NONE":
             continue  # Skip clean records that were wrongly flagged
 
