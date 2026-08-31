@@ -190,6 +190,7 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
         )
 
         ai_results_map = {}
+        provider_map = {}   # index -> which service answered
 
         if use_ai:
             # -- Try Groq first --
@@ -197,18 +198,18 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
             if raw:
                 try:
                     parsed = json.loads(raw)
-                    # Groq may return a dict with a key wrapping the array
                     if isinstance(parsed, dict):
                         parsed = next(iter(parsed.values()))
                     for item in parsed:
                         ai_results_map[item["index"]] = item
+                        provider_map[item["index"]] = "Groq (Llama 3 70B)"
                     logger.info(f"Groq successfully processed {len(ai_results_map)} anomalies")
                 except Exception as e:
                     logger.warning(f"Groq response parse failed: {e}")
 
             # -- Fall back to Gemini if Groq didn't cover everything --
             if len(ai_results_map) < len(to_investigate):
-                client = _get_next_client()  # Draw ONCE (Fix 4)
+                client = _get_next_client()
                 if client:
                     try:
                         response = client.models.generate_content(
@@ -221,7 +222,6 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
                             },
                         )
                         text = response.text.strip()
-                        # Strip markdown fences if present
                         if text.startswith("```"):
                             lines = text.split("\n")
                             text = "\n".join(lines[1:-1])
@@ -232,9 +232,9 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
                             idx = item.get("index", -1)
                             if idx not in ai_results_map:
                                 ai_results_map[idx] = item
+                                provider_map[idx] = "Gemini (gemini-3.5-flash)"
                         logger.info(f"Gemini filled in {len(ai_results_map)} anomalies")
                     except Exception as e:
-                        # Fix 5b: Never surface raw exception to judges
                         logger.warning(f"Gemini batch call failed: {e}")
 
         if progress_callback:
@@ -251,10 +251,14 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
                     "ai_confidence": r.get("confidence", "low"),
                     "ai_suggested_resolution": r.get("suggested_resolution", "Manual review recommended."),
                     "needs_manual_review": r.get("needs_manual_review", True),
+                    "ai_provider": provider_map.get(j, "Groq (Llama 3 70B)"),
                 }
             else:
-                # Fix 6: Strong rule-based fallback -- looks intentional, not broken
-                enriched = {**a, **_fallback_classification(a)}
+                enriched = {
+                    **a,
+                    **_fallback_classification(a),
+                    "ai_provider": "Rule-based (deterministic)",
+                }
             results.append(enriched)
 
     # Re-attach deterministic (fee-discrepancy) results
@@ -266,6 +270,7 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
             "ai_confidence": "high",
             "ai_suggested_resolution": "Verify fee rate with Razorpay account settings.",
             "needs_manual_review": False,
+            "ai_provider": "Rule-based (deterministic)",
         })
 
     return results
@@ -284,6 +289,7 @@ def save_ai_cache(anomalies: list, cache_path: str):
             "ai_confidence": a.get("ai_confidence"),
             "ai_suggested_resolution": a.get("ai_suggested_resolution"),
             "needs_manual_review": a.get("needs_manual_review"),
+            "ai_provider": a.get("ai_provider", "Rule-based (deterministic)"),
         }
         for a in anomalies
         if a.get("ai_classification")
@@ -304,14 +310,19 @@ def load_ai_cache(anomalies: list, cache_path: str) -> list:
         for a in anomalies:
             oid = a.get("order_id")
             if oid in cached:
-                merged.append({**a, **cached[oid]})
+                c = cached[oid]
+                # Backfill ai_provider if missing from older cache files
+                if "ai_provider" not in c:
+                    c["ai_provider"] = "Cached result"
+                merged.append({**a, **c})
             else:
-                merged.append({**a, **_fallback_classification(a)})
+                merged.append({**a, **_fallback_classification(a), "ai_provider": "Rule-based (deterministic)"})
         logger.info(f"Loaded AI results from cache: {cache_path}")
         return merged
     except Exception as e:
         logger.warning(f"Cache load failed: {e}")
         return anomalies
+
 
 
 # ─── Fallback Classification (Fix 6) ─────────────────────────────────────────

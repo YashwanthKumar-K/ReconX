@@ -433,6 +433,7 @@ if st.session_state.report is not None:
                         explanation = anomaly.get("ai_explanation", "No explanation available.")
                         st.info(explanation)
 
+                        st.write(f"**Provider:** `{anomaly.get('ai_provider', 'Unknown')}`")
                         st.write(f"**Classification:** `{anomaly.get('ai_classification', 'N/A')}`")
                         st.write(f"**Confidence:** `{confidence}`")
                         st.write(f"**Resolution:** {anomaly.get('ai_suggested_resolution', 'N/A')}")
