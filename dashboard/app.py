@@ -278,9 +278,13 @@ if st.session_state.report is not None:
         p1_anomalies = phase_stats[0]["anomaly_count"]   # orders flagged in Phase 1
         p2_matched   = phase_stats[1].get("orders_resolved", 0)  # orders resolved via settlements
         p3_matched   = phase_stats[2]["matched_count"]   # orders resolved via subset-sum
-        # Remaining anomalies = total - matched at any phase
-        resolved     = p1_matched + p2_matched + p3_matched
-        unresolved   = total_orders - resolved
+        
+        # Phase 3 resolves at the SETTLEMENT level, not the order level.
+        # The 9 orders in setl_002 were already counted in Phase 1.
+        # Adding p3_matched (=1 settlement) to an order count would be a units mismatch.
+        # Funnel stays at order-level throughout; settlement resolution shown separately.
+        order_resolved   = p1_matched + p2_matched   # strictly order-level matched
+        p3_settlements   = phase_stats[2]["matched_count"]  # settlements resolved by Phase 3
 
         # Use total_anomalies for the exception bar (includes settlement + bank level)
         total_anomalies = report["total_anomalies"]
@@ -289,7 +293,7 @@ if st.session_state.report is not None:
             {"Phase": "Input Orders",                    "Count": total_orders},
             {"Phase": "Phase 1: Direct Match",           "Count": p1_matched},
             {"Phase": "Phase 2: Settlement Match",       "Count": p1_matched + p2_matched},
-            {"Phase": "Phase 3: Subset-Sum Match",       "Count": p1_matched + p2_matched + p3_matched},
+            {"Phase": "Phase 3: Settlement Resolved",    "Count": p1_matched + p2_matched},  # stays same — settlement level
             {"Phase": "Total Anomalies / Exceptions",    "Count": total_anomalies},
         ])
 
@@ -308,10 +312,11 @@ if st.session_state.report is not None:
         )
         st.plotly_chart(fig_funnel, use_container_width=True)
 
-        # Summary math sanity check
-        col_m, col_a = st.columns(2)
-        col_m.success(f"**Resolved:** {resolved} / {total_orders} orders ({round(resolved/total_orders*100,1)}%)")
-        col_a.error(f"**Exceptions flagged:** {total_anomalies} total (order + settlement level)")
+        # Summary — math must check out: matched + anomalies = total_orders
+        col_m, col_a, col_s = st.columns(3)
+        col_m.success(f"**Orders Resolved:** {order_resolved} / {total_orders} ({round(order_resolved/total_orders*100,1)}%)")
+        col_a.error(f"**Exceptions Flagged:** {total_anomalies} (order + settlement level)")
+        col_s.info(f"**Settlements resolved by Phase 3:** {p3_settlements}")
 
 
         # Phase stats table
