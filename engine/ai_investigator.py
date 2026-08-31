@@ -221,37 +221,29 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
                 entry["nearby_transactions"] = nearby[:3]
             batch_input.append(entry)
 
-        batch_prompt = (
-            "Analyze EACH of the following reconciliation anomalies independently. "
-            "Return a JSON array, one object per anomaly, in the SAME order.\n\n"
-            f"ANOMALIES:\n{json.dumps(batch_input, indent=2, default=str)}"
-        )
-
         ai_results_map = {}
-        provider_map = {}   # index -> which service answered
+        provider_map = {}
 
         if use_ai:
-            # -- Try Groq first --
-            raw = _call_groq(batch_prompt)
-            if raw:
-                try:
-                    parsed = json.loads(raw)
-                    if isinstance(parsed, dict):
-                        parsed = next(iter(parsed.values()))
-                    for item in parsed:
-                        ai_results_map[item["index"]] = item
-                        provider_map[item["index"]] = "Groq (Llama 3 70B)"
-                    logger.info(f"Groq successfully processed {len(ai_results_map)} anomalies")
-                except Exception as e:
-                    logger.warning(f"Groq response parse failed: {e}")
-
-            # -- Try NVIDIA NIM --
-            if len(ai_results_map) < len(to_investigate):
-                raw = _call_nvidia(batch_prompt)
-                if raw:
+            import concurrent.futures
+            
+            chunk_size = 20
+            chunks = [batch_input[i:i + chunk_size] for i in range(0, len(batch_input), chunk_size)]
+            
+            def process_chunk(chunk):
+                chunk_prompt = (
+                    "Analyze EACH of the following reconciliation anomalies independently. "
+                    "Return a JSON array, one object per anomaly, in the SAME order.\n\n"
+                    f"ANOMALIES:\n{json.dumps(chunk, indent=2, default=str)}"
+                )
+                
+                results = {}
+                providers = {}
+                
+                # Helper to parse and map responses
+                def parse_and_map(raw_text, provider_name):
                     try:
-                        # Strip markdown fences if present
-                        text = raw.strip()
+                        text = raw_text.strip()
                         if text.startswith("```"):
                             lines = text.split("\n")
                             text = "\n".join(lines[1:-1])
@@ -259,44 +251,66 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
                         parsed = json.loads(text)
                         if isinstance(parsed, dict):
                             parsed = next(iter(parsed.values()))
+                        
+                        count = 0
                         for item in parsed:
                             idx = item.get("index", -1)
-                            if idx not in ai_results_map:
-                                ai_results_map[idx] = item
-                                provider_map[idx] = "NVIDIA (Llama 3.1 70B)"
-                        logger.info(f"NVIDIA filled in {len(ai_results_map)} anomalies")
+                            if idx != -1 and idx not in results:
+                                results[idx] = item
+                                providers[idx] = provider_name
+                                count += 1
+                        return count == len(chunk)
                     except Exception as e:
-                        logger.warning(f"NVIDIA response parse failed: {e}")
+                        logger.warning(f"{provider_name} parse failed: {e}")
+                        return False
 
-            # -- Fall back to Gemini --
-            if len(ai_results_map) < len(to_investigate):
-                client = _get_next_client()
-                if client:
-                    try:
-                        response = client.models.generate_content(
-                            model="gemini-3.5-flash",
-                            contents=batch_prompt,
-                            config={
-                                "system_instruction": SYSTEM_PROMPT,
-                                "temperature": 0.1,
-                                "http_options": {"timeout": 10},
-                            },
+                # 1. Groq
+                raw_groq = _call_groq(chunk_prompt)
+                if raw_groq and parse_and_map(raw_groq, "Groq (Llama 3 70B)"):
+                    return results, providers
+                    
+                # 2. NVIDIA NIM
+                if len(results) < len(chunk):
+                    raw_nvidia = _call_nvidia(chunk_prompt)
+                    if raw_nvidia and parse_and_map(raw_nvidia, "NVIDIA (Llama 3.1 70B)"):
+                        return results, providers
+                
+                # 3. Gemini
+                if len(results) < len(chunk):
+                    client = _get_next_client()
+                    if client:
+                        try:
+                            response = client.models.generate_content(
+                                model="gemini-3.5-flash",
+                                contents=chunk_prompt,
+                                config={
+                                    "system_instruction": SYSTEM_PROMPT,
+                                    "temperature": 0.1,
+                                    "http_options": {"timeout": 10},
+                                },
+                            )
+                            parse_and_map(response.text, "Gemini (gemini-3.5-flash)")
+                        except Exception as e:
+                            logger.warning(f"Gemini chunk call failed: {e}")
+                            
+                return results, providers
+
+            completed_chunks = 0
+            # Run chunks in parallel
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                future_to_chunk = {executor.submit(process_chunk, chunk): chunk for chunk in chunks}
+                for future in concurrent.futures.as_completed(future_to_chunk):
+                    chunk_res, chunk_prov = future.result()
+                    ai_results_map.update(chunk_res)
+                    provider_map.update(chunk_prov)
+                    
+                    completed_chunks += 1
+                    if progress_callback:
+                        progress_callback(
+                            completed_chunks, 
+                            len(chunks), 
+                            f"Processed {completed_chunks}/{len(chunks)} batches..."
                         )
-                        text = response.text.strip()
-                        if text.startswith("```"):
-                            lines = text.split("\n")
-                            text = "\n".join(lines[1:-1])
-                        parsed = json.loads(text)
-                        if isinstance(parsed, dict):
-                            parsed = next(iter(parsed.values()))
-                        for item in parsed:
-                            idx = item.get("index", -1)
-                            if idx not in ai_results_map:
-                                ai_results_map[idx] = item
-                                provider_map[idx] = "Gemini (gemini-3.5-flash)"
-                        logger.info(f"Gemini filled in {len(ai_results_map)} anomalies")
-                    except Exception as e:
-                        logger.warning(f"Gemini batch call failed: {e}")
 
         if progress_callback:
             progress_callback(len(to_investigate), len(anomalies), "AI investigation complete")
