@@ -7,3 +7,9 @@ venv/
 dist/
 build/
 .streamlit/secrets.toml
+
+# User-uploaded data — privacy risk, never commit
+data/uploaded/
+
+# AI result caches — stale demo risk
+data/*/cached_ai_results.json

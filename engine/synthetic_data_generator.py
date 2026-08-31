@@ -74,7 +74,7 @@ def generate_data(
     os.makedirs(output_dir, exist_ok=True)
 
     # ─── Decide which orders get anomalies ────────────────────────────────
-    num_anomalies = max(3, int(num_orders * ANOMALY_RATIO))
+    num_anomalies = min(num_orders, max(1, int(num_orders * ANOMALY_RATIO)))
     anomaly_indices = set(random.sample(range(num_orders), num_anomalies))
 
     # Assign anomaly types round-robin so every type appears at least once
@@ -238,6 +238,8 @@ def generate_data(
 
     # ─── Generate Bank Statement from settlements ─────────────────────────
     split_settlement_id = None
+    actually_split_orders = set()  # Track orders where the split actually happened
+
     for setl_id, setl_data in settlements.items():
         net_total = round(setl_data["net_total"], 2)
         setl_date = setl_data["settlement_date"]
@@ -245,15 +247,14 @@ def generate_data(
         # Check if any order in this settlement is a SPLIT_SETTLEMENT anomaly
         has_split = False
         for oid in setl_data["order_ids"]:
-            idx = None
-            for j, gt in enumerate(ground_truth_rows):
+            for gt in ground_truth_rows:
                 if gt["order_id"] == oid and gt["injected_anomaly_type"] == "SPLIT_SETTLEMENT":
                     has_split = True
                     split_settlement_id = setl_id
                     break
 
         if has_split and net_total > 1000:
-            # Split into two bank deposits
+            # Only split if amount is large enough — and record which orders this affects
             split_amount = round(net_total * 0.6, 2)
             remainder = round(net_total - split_amount, 2)
 
@@ -271,6 +272,9 @@ def generate_data(
                 "description": f"RAZORPAY SETTLEMENT {setl_id} PART2",
                 "bank_ref": _random_id("REF_"),
             })
+            # Record which orders were truly split so ground truth stays accurate
+            for oid in setl_data["order_ids"]:
+                actually_split_orders.add(oid)
         else:
             bank_rows.append({
                 "utr_number": _random_id("UTR"),
@@ -279,6 +283,12 @@ def generate_data(
                 "description": f"RAZORPAY SETTLEMENT {setl_id}",
                 "bank_ref": _random_id("REF_"),
             })
+
+    # Fix up ground truth: reclassify SPLIT_SETTLEMENT to NONE if no split actually happened
+    for gt in ground_truth_rows:
+        if gt["injected_anomaly_type"] == "SPLIT_SETTLEMENT" and gt["order_id"] not in actually_split_orders:
+            gt["injected_anomaly_type"] = "NONE"
+
 
     # ─── Write CSVs ───────────────────────────────────────────────────────
 

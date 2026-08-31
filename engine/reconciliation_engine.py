@@ -179,8 +179,8 @@ def run_reconciliation(
         "phase_name": "Phase 4: AI Anomaly Investigation",
         "input_count": len(all_anomalies),
         "anomaly_count": len(all_anomalies),
-        "explained_count": sum(1 for a in enriched_anomalies if "resolution" in a),
-        "remaining_count": len(all_anomalies),
+        "explained_count": sum(1 for a in enriched_anomalies if a.get("ai_suggested_resolution")),
+        "remaining_count": sum(1 for a in enriched_anomalies if a.get("needs_manual_review", True)),
     }
 
     if verbose:

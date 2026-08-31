@@ -52,10 +52,12 @@ def score_results(
     # Did the engine correctly flag anomalous records and pass clean ones?
     engine_correct = 0
     engine_total = 0
+    seen_order_ids = set()  # Prevent any order being scored twice
 
     # Check clean matches — should be NONE in ground truth
     for oid in all_matched_order_ids:
-        if oid in gt_dict:
+        if oid in gt_dict and oid not in seen_order_ids:
+            seen_order_ids.add(oid)
             engine_total += 1
             if gt_dict[oid] == "NONE":
                 engine_correct += 1
@@ -72,17 +74,21 @@ def score_results(
             if isinstance(rz_data, dict):
                 sub_order_ids = rz_data.get("order_ids", [])
                 for sub_oid in sub_order_ids:
-                    if sub_oid in gt_dict and gt_dict[sub_oid] != "NONE" and sub_oid not in anomaly_order_ids:
+                    if sub_oid in gt_dict and sub_oid not in seen_order_ids:
+                        seen_order_ids.add(sub_oid)
                         anomaly_order_ids.add(sub_oid)
                         engine_total += 1
-                        engine_correct += 1  # Correctly flagged an anomalous order
+                        if gt_dict[sub_oid] != "NONE":
+                            engine_correct += 1  # Correctly flagged an anomalous order
             continue
 
-        anomaly_order_ids.add(oid)
-        if oid in gt_dict:
-            engine_total += 1
-            if gt_dict[oid] != "NONE":
-                engine_correct += 1
+        if oid not in seen_order_ids:
+            seen_order_ids.add(oid)
+            anomaly_order_ids.add(oid)
+            if oid in gt_dict:
+                engine_total += 1
+                if gt_dict[oid] != "NONE":
+                    engine_correct += 1
 
     engine_accuracy = round(engine_correct / engine_total * 100, 1) if engine_total > 0 else 0.0
 
