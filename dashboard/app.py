@@ -457,88 +457,100 @@ if st.session_state.report is not None:
 
     with tab_accuracy:
         st.markdown("### Accuracy Report — Ground Truth Validation")
-        st.markdown(
-            "This proves our engine and AI are actually correct, not just plausible. "
-            "Results are scored against a labeled ground truth dataset."
-        )
 
         scores = report["scores"]
 
-        # Accuracy metrics
-        col_acc1, col_acc2 = st.columns(2)
-        with col_acc1:
-            st.markdown("#### Engine Detection Accuracy")
-            fig_eng = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=scores["engine_accuracy"],
-                title={"text": "Engine Accuracy %"},
-                gauge={
-                    "axis": {"range": [0, 100]},
-                    "bar": {"color": "#4caf50"},
-                    "bgcolor": "#1a1f2e",
-                    "steps": [
-                        {"range": [0, 60], "color": "#ff4b4b33"},
-                        {"range": [60, 85], "color": "#ffa50033"},
-                        {"range": [85, 100], "color": "#4caf5033"},
-                    ],
-                },
-            ))
-            fig_eng.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white"),
-                height=250,
-                margin=dict(l=20, r=20, t=40, b=20),
+        if scores.get("engine_accuracy") is None:
+            st.info(
+                "**Ground truth not available for uploaded data.**\n\n"
+                "Accuracy scoring requires a `ground_truth.csv` answer key. "
+                "This tab shows live results when using the **Load Sample Data** or "
+                "**Generate 500 Orders** buttons which include a labeled ground truth dataset."
             )
-            st.plotly_chart(fig_eng, use_container_width=True)
-            st.write(f"Correctly classified: **{scores['engine_correct']}/{scores['engine_total']}** records")
-
-        with col_acc2:
-            st.markdown("#### AI Classification Accuracy")
-            fig_ai = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=scores["ai_accuracy"],
-                title={"text": "AI Accuracy %"},
-                gauge={
-                    "axis": {"range": [0, 100]},
-                    "bar": {"color": "#667eea"},
-                    "bgcolor": "#1a1f2e",
-                    "steps": [
-                        {"range": [0, 60], "color": "#ff4b4b33"},
-                        {"range": [60, 85], "color": "#ffa50033"},
-                        {"range": [85, 100], "color": "#4caf5033"},
-                    ],
-                },
-            ))
-            fig_ai.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white"),
-                height=250,
-                margin=dict(l=20, r=20, t=40, b=20),
-            )
-            st.plotly_chart(fig_ai, use_container_width=True)
-            st.write(f"Correctly classified: **{scores['ai_correct']}/{scores['ai_total']}** anomalies")
-
-        # AI classification details
-        if scores.get("ai_details"):
-            st.markdown("#### Classification Details")
-            details_df = pd.DataFrame(scores["ai_details"])
-            st.dataframe(details_df, use_container_width=True)
-
-        # Undetected anomalies
-        if scores.get("undetected_anomalies"):
-            st.markdown("#### Undetected Anomalies (Honest Exception List)")
-            st.warning(f"{len(scores['undetected_anomalies'])} anomalies were not detected by the engine:")
-            for u in scores["undetected_anomalies"]:
-                st.write(f"- **{u['order_id']}**: {u['missed_anomaly_type']}")
         else:
-            st.success("All injected anomalies were detected!")
+            st.markdown(
+                "This proves our engine and AI are actually correct, not just plausible. "
+                "Results are scored against a labeled ground truth dataset."
+            )
 
-        # Confusion matrix
-        if scores.get("confusion_matrix"):
-            st.markdown("#### Confusion Matrix")
-            cm = scores["confusion_matrix"]
-            cm_df = pd.DataFrame(cm).fillna(0).astype(int)
-            st.dataframe(cm_df, use_container_width=True)
+            # Accuracy metrics
+            col_acc1, col_acc2 = st.columns(2)
+            with col_acc1:
+                st.markdown("#### Engine Detection Accuracy")
+                fig_eng = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=scores["engine_accuracy"],
+                    title={"text": "Engine Accuracy %"},
+                    gauge={
+                        "axis": {"range": [0, 100]},
+                        "bar": {"color": "#4caf50"},
+                        "bgcolor": "#1a1f2e",
+                        "steps": [
+                            {"range": [0, 60], "color": "#ff4b4b33"},
+                            {"range": [60, 85], "color": "#ffa50033"},
+                            {"range": [85, 100], "color": "#4caf5033"},
+                        ],
+                    },
+                ))
+                fig_eng.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="white"),
+                    height=250,
+                    margin=dict(l=20, r=20, t=40, b=20),
+                )
+                st.plotly_chart(fig_eng, use_container_width=True)
+                ec = scores.get("engine_correct", "?")
+                et = scores.get("engine_total", "?")
+                st.write(f"Correctly classified: **{ec}/{et}** records")
+
+            with col_acc2:
+                st.markdown("#### AI Classification Accuracy")
+                fig_ai = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=scores["ai_accuracy"],
+                    title={"text": "AI Accuracy %"},
+                    gauge={
+                        "axis": {"range": [0, 100]},
+                        "bar": {"color": "#667eea"},
+                        "bgcolor": "#1a1f2e",
+                        "steps": [
+                            {"range": [0, 60], "color": "#ff4b4b33"},
+                            {"range": [60, 85], "color": "#ffa50033"},
+                            {"range": [85, 100], "color": "#4caf5033"},
+                        ],
+                    },
+                ))
+                fig_ai.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="white"),
+                    height=250,
+                    margin=dict(l=20, r=20, t=40, b=20),
+                )
+                st.plotly_chart(fig_ai, use_container_width=True)
+                st.write(f"Correctly classified: **{scores['ai_correct']}/{scores['ai_total']}** anomalies")
+
+            # AI classification details
+            if scores.get("ai_details"):
+                st.markdown("#### Classification Details")
+                details_df = pd.DataFrame(scores["ai_details"])
+                st.dataframe(details_df, use_container_width=True)
+
+            # Undetected anomalies
+            if scores.get("undetected_anomalies"):
+                st.markdown("#### Undetected Anomalies (Honest Exception List)")
+                st.warning(f"{len(scores['undetected_anomalies'])} anomalies were not detected by the engine:")
+                for u in scores["undetected_anomalies"]:
+                    st.write(f"- **{u['order_id']}**: {u['missed_anomaly_type']}")
+            else:
+                st.success("All injected anomalies were detected!")
+
+            # Confusion matrix
+            if scores.get("confusion_matrix"):
+                st.markdown("#### Confusion Matrix")
+                cm = scores["confusion_matrix"]
+                cm_df = pd.DataFrame(cm).fillna(0).astype(int)
+                st.dataframe(cm_df, use_container_width=True)
+
 
     # ─── Performance ──────────────────────────────────────────────────
     st.markdown("---")

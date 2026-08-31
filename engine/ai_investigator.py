@@ -111,7 +111,7 @@ def _call_groq(prompt: str) -> Optional[str]:
                 data=json.dumps(payload).encode("utf-8"),
                 headers=headers,
             )
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=6) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 return data["choices"][0]["message"]["content"]
         except Exception as e:
@@ -197,6 +197,7 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
                             config={
                                 "system_instruction": SYSTEM_PROMPT,
                                 "temperature": 0.1,
+                                "http_options": {"timeout": 10},
                             },
                         )
                         text = response.text.strip()
