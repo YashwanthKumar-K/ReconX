@@ -8,13 +8,13 @@
 
 ReconX is an enterprise-grade reconciliation engine that automatically matches transactions across three complex financial ledgers: **Merchant Records**, **Razorpay Payments**, and **Bank Deposits**.
 
-When numbers don't match, ReconX doesn't just fail—it deploys a parallel swarm of AI models (Groq, NVIDIA NIM, and Google Gemini) to investigate the discrepancy, explain exactly what went wrong, and suggest a resolution.
+When numbers don't match, ReconX deploys a parallel ensemble of AI models (Groq, NVIDIA NIM, and Google Gemini) to investigate the discrepancy, explain the root cause, and suggest a resolution.
 
 ---
 
-## 🛑 The Problem: The 100-Hour Finance Nightmare
+## 🛑 The Problem: Disjointed Ledgers
 
-Every mid-to-large merchant using Razorpay has three completely disjointed sources of truth:
+Every mid-to-large merchant using Razorpay has three distinct sources of truth:
 
 | Ledger | Level of Detail | Example |
 |--------|-----------------|---------|
@@ -22,15 +22,15 @@ Every mid-to-large merchant using Razorpay has three completely disjointed sourc
 | **Razorpay** | Transaction level | "Processed ₹1,000, took ₹20 fee" (Pay: `pay_xyz`) |
 | **Bank Account** | Batch level | "Deposited ₹45,230" (Batch: `setl_abc`) |
 
-**The Disconnect:** Razorpay bundles payments into settlements. One bank deposit might cover 50+ orders. If an order was partially refunded, if the settlement was split across two days, or if a fee rate was altered, the totals won't match. Finance teams currently spend hundreds of hours every month in Excel playing detective to figure out *why* a ₹45,230 bank deposit doesn't match a ₹46,000 merchant ledger.
+**The Disconnect:** Razorpay bundles payments into settlements. One bank deposit might cover 50+ orders. If an order was partially refunded, if the settlement was split across two days, or if a fee rate was altered, the totals won't match. Finance teams currently spend significant time manually investigating these discrepancies to understand why a bank deposit doesn't perfectly match the merchant ledger.
 
 ---
 
 ## 🚀 The Solution: A Hybrid Pipeline
 
-LLMs are terrible at arithmetic but incredible at semantic reasoning. ReconX enforces a strict architectural boundary: **AI never does math.**
+LLMs are prone to hallucination when performing arithmetic, but excel at semantic reasoning. ReconX enforces a strict architectural boundary: **AI is isolated from mathematical computations.**
 
-ReconX processes 10,000+ orders in fractions of a second using a **4-Phase Hybrid Pipeline**:
+ReconX processes high-volume datasets using a **4-Phase Hybrid Pipeline**:
 
 ```text
 Phase 1: Direct Key Matching (Deterministic HashMaps, ~90% matched)
@@ -44,34 +44,34 @@ Phase 4: AI Anomaly Investigation (Parallel LLM reasoning)
 
 ---
 
-## ✨ The "Hidden Gold" (Engineering Highlights)
+## ✨ Engineering Architecture & Core Features
 
-We built ReconX to survive enterprise-scale loads and demo-day disasters. Here is what is happening under the hood:
+We built ReconX to handle enterprise-scale workloads reliably. Here are the core architectural decisions:
 
-### 1. Parallel Scatter-Gather AI Routing (Zero Token Limits)
-If a batch contains 800 anomalies, sending them in a single prompt will crash any LLM due to context limits. ReconX automatically slices anomalies into chunks of 20, spins up a **ThreadPool**, and processes them in parallel. 
-* *Result: 10,000 orders with 700 anomalies processed in seconds.*
+### 1. Parallel Scatter-Gather AI Routing
+If a batch contains hundreds of anomalies, sending them in a single prompt will exceed LLM context limits. ReconX automatically slices anomalies into chunks of 20, initializes a **ThreadPool**, and processes them in parallel. 
+* *Performance: 10,000 orders with 700+ anomalies processed in seconds.*
 
 ### 2. The AI Waterfall Fallback
 To ensure 100% uptime, ReconX routes traffic through a prioritized, fault-tolerant cascade:
 1. **Groq (Llama 3 70B)** — Ultra-fast inference, strict JSON adherence.
 2. **NVIDIA NIM (Llama 3.1 70B)** — Steps in automatically if Groq hits a rate limit.
 3. **Google Gemini (3.5 Flash)** — The final cloud fallback.
-4. **Deterministic Rule-Based Engine** — If all APIs fail (or wifi drops), the engine falls back to hardcoded algorithmic classifications. **ReconX never crashes.**
+4. **Deterministic Rule-Based Engine** — If all APIs fail, the engine defaults to strict algorithmic classifications, ensuring continuous operation under API failures.
 
 ### 3. Ground Truth Accuracy Scoring
-We don't just output AI guesses and hope they look right. ReconX includes a built-in synthetic data generator that injects known, labeled anomalies (e.g., `TIMING_MISMATCH`). The engine automatically grades its own performance, generating an **Accuracy Report and Confusion Matrix**. 
+To ensure reliability, ReconX includes a built-in synthetic data generator that injects known, labeled anomalies (e.g., `TIMING_MISMATCH`). The engine automatically grades its own performance against this dataset, generating an **Accuracy Report and Confusion Matrix**. 
 
 ### 4. Bounded Subset-Sum Matching (Anti-NP-Hard)
-Finding which transactions sum up to a specific bank deposit is a variation of the Subset-Sum problem (which is NP-Hard). ReconX intelligently prunes the search space using a ±2 day sliding window and max-depth boundaries to guarantee it never hangs on edge cases.
+Finding which transactions sum up to a specific bank deposit is a variation of the Subset-Sum problem (which is computationally NP-Hard). ReconX prunes the search space using a ±2 day sliding window and max-depth boundaries to guarantee predictable execution times.
 
 ---
 
 ## 📊 Dashboard Preview
 
-ReconX ships with a beautiful, responsive Streamlit dashboard featuring:
+ReconX provides a comprehensive Streamlit dashboard featuring:
 - **3-Way Matched Transactions View**
-- **AI Anomaly Investigation Panel** (with provider badges showing exactly which AI solved the case)
+- **AI Anomaly Investigation Panel** (with provider badges showing which AI handled the classification)
 - **Settlement Breakdown**
 - **Accuracy & Confusion Matrix Scoring**
 - **1-Click CSV/JSON Export**
