@@ -143,14 +143,37 @@ if sample_500_btn:
     st.session_state.data_size = 500
 
 if uploaded_files and len(uploaded_files) >= 3:
+    import shutil
     upload_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "uploaded")
+    
+    # 1. Clear stale files to prevent cache or ground_truth pollution
+    if os.path.exists(upload_dir):
+        shutil.rmtree(upload_dir)
     os.makedirs(upload_dir, exist_ok=True)
+    
+    # 2. Save files using strict whitelisted names
+    saved_count = 0
     for f in uploaded_files:
-        with open(os.path.join(upload_dir, f.name), "wb") as out:
-            out.write(f.getbuffer())
-    data_dir = upload_dir
-    st.session_state.data_dir = data_dir
-    st.success(f"Loaded {len(uploaded_files)} files! Click RECONCILE below.")
+        name_lower = f.name.lower()
+        target_name = None
+        if "merchant" in name_lower or "order" in name_lower:
+            target_name = "merchant_orders.csv"
+        elif "razorpay" in name_lower or "transaction" in name_lower:
+            target_name = "razorpay_transactions.csv"
+        elif "bank" in name_lower or "statement" in name_lower:
+            target_name = "bank_statement.csv"
+        
+        if target_name:
+            with open(os.path.join(upload_dir, target_name), "wb") as out:
+                out.write(f.getbuffer())
+            saved_count += 1
+            
+    if saved_count >= 3:
+        data_dir = upload_dir
+        st.session_state.data_dir = data_dir
+        st.success(f"Loaded and normalized 3 ledger files! Click RECONCILE below.")
+    else:
+        st.error("Could not identify the 3 required files. Please ensure names contain 'merchant', 'razorpay', and 'bank'.")
 
 if data_dir or "data_dir" in st.session_state:
     active_dir = data_dir or st.session_state.get("data_dir")

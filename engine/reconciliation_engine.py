@@ -158,28 +158,33 @@ def run_reconciliation(
                 "note": "Bank deposit could not be matched to any combination of settlements.",
             })
 
-    # Investigate with AI
-    if use_ai and all_anomalies:
-        enriched_anomalies = investigate_batch(all_anomalies)
-    else:
-        enriched_anomalies = all_anomalies
-        for a in enriched_anomalies:
-            if "ai_classification" not in a:
-                a["ai_classification"] = a.get("anomaly_type", "REQUIRES_MANUAL_REVIEW")
-                a["ai_explanation"] = a.get("note", "")
-                a["ai_confidence"] = "medium"
-                a["ai_suggested_resolution"] = "Manual review recommended."
-                a["needs_manual_review"] = True
+    # Add successful split settlement matches as anomalies (they are matched financially, but are still exceptions)
+    for match in p3_matches:
+        if match.get("type") == "split_settlement_match":
+            all_anomalies.append({
+                "order_id": f"SETTLEMENT_{match.get('settlement_id', 'unknown')}",
+                "anomaly_type": "SPLIT_SETTLEMENT",
+                "detected_in_phase": "Phase 3: Fuzzy/Subset-Sum Matching",
+                "razorpay_data": {
+                    "settlement_id": match.get("settlement_id"),
+                    "order_ids": match.get("order_ids", [])
+                },
+                "note": match.get("note", "Split settlement resolved via Phase 3"),
+            })
 
+    # Investigate with AI
+    enriched_anomalies = investigate_batch(all_anomalies, use_ai=use_ai)
+    
     p4_stats = {
         "phase_name": "Phase 4: AI Anomaly Investigation",
         "input_count": len(all_anomalies),
-        "matched_count": 0,
-        "anomaly_count": len(enriched_anomalies),
-        "remaining_count": sum(1 for a in enriched_anomalies if a.get("needs_manual_review", False)),
+        "anomaly_count": len(all_anomalies),
+        "explained_count": sum(1 for a in enriched_anomalies if "resolution" in a),
+        "remaining_count": len(all_anomalies),
     }
+
     if verbose:
-        print(f"  Anomalies investigated: {len(enriched_anomalies)}")
+        print(f"  Anomalies investigated: {p4_stats['explained_count']}")
         print(f"  Needs manual review: {p4_stats['remaining_count']}")
 
     # ─── Scoring ──────────────────────────────────────────────────────────
@@ -209,15 +214,15 @@ def run_reconciliation(
     elapsed = round(time.time() - start_time, 2)
 
     # ─── Build Final Report ───────────────────────────────────────────────
-    total_matched = len(p1_matched) + len(p2_matches) + len(p3_matches)
+    total_matched = len(p1_matched)
     total_records = len(merchant_df)
-    match_rate = round(len(p1_matched) / total_records * 100, 1) if total_records > 0 else 0
+    match_rate = round((total_matched / total_records) * 100, 1) if total_records > 0 else 0
 
     report = {
         "total_merchant_orders": len(merchant_df),
         "total_razorpay_transactions": len(razorpay_df),
         "total_bank_deposits": len(bank_df),
-        "total_matched": len(p1_matched),
+        "total_matched": total_matched,
         "total_anomalies": len(enriched_anomalies),
         "match_rate": match_rate,
         "phase_stats": [p1_stats, p2_stats, p3_stats, p4_stats],
@@ -232,7 +237,7 @@ def run_reconciliation(
     if verbose:
         print(f"\n{'=' * 60}")
         print(f"  RECONCILIATION COMPLETE in {elapsed}s")
-        print(f"  Match rate: {match_rate}% ({len(p1_matched)}/{total_records})")
+        print(f"  Match rate: {match_rate}% ({total_matched}/{total_records})")
         print(f"  Total anomalies: {len(enriched_anomalies)}")
         print(f"  Engine accuracy: {scores['engine_accuracy']}%")
         print(f"  AI accuracy: {scores['ai_accuracy']}%")

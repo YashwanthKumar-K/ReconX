@@ -123,7 +123,7 @@ def _call_groq(prompt: str) -> Optional[str]:
 # ─── Batch Investigation (Fix 1 + Fix 4) ─────────────────────────────────────
 
 def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] = None,
-                      progress_callback=None) -> list:
+                      progress_callback=None, use_ai: bool = True) -> list:
     """
     Investigate ALL anomalies in a SINGLE API call (batch prompt).
 
@@ -171,49 +171,50 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
 
         ai_results_map = {}
 
-        # -- Try Groq first --
-        raw = _call_groq(batch_prompt)
-        if raw:
-            try:
-                parsed = json.loads(raw)
-                # Groq may return a dict with a key wrapping the array
-                if isinstance(parsed, dict):
-                    parsed = next(iter(parsed.values()))
-                for item in parsed:
-                    ai_results_map[item["index"]] = item
-                logger.info(f"Groq successfully processed {len(ai_results_map)} anomalies")
-            except Exception as e:
-                logger.warning(f"Groq response parse failed: {e}")
-
-        # -- Fall back to Gemini if Groq didn't cover everything --
-        if len(ai_results_map) < len(to_investigate):
-            client = _get_next_client()  # Draw ONCE (Fix 4)
-            if client:
+        if use_ai:
+            # -- Try Groq first --
+            raw = _call_groq(batch_prompt)
+            if raw:
                 try:
-                    response = client.models.generate_content(
-                        model="gemini-3.5-flash",
-                        contents=batch_prompt,
-                        config={
-                            "system_instruction": SYSTEM_PROMPT,
-                            "temperature": 0.1,
-                        },
-                    )
-                    text = response.text.strip()
-                    # Strip markdown fences if present
-                    if text.startswith("```"):
-                        lines = text.split("\n")
-                        text = "\n".join(lines[1:-1])
-                    parsed = json.loads(text)
+                    parsed = json.loads(raw)
+                    # Groq may return a dict with a key wrapping the array
                     if isinstance(parsed, dict):
                         parsed = next(iter(parsed.values()))
                     for item in parsed:
-                        idx = item.get("index", -1)
-                        if idx not in ai_results_map:
-                            ai_results_map[idx] = item
-                    logger.info(f"Gemini filled in {len(ai_results_map)} anomalies")
+                        ai_results_map[item["index"]] = item
+                    logger.info(f"Groq successfully processed {len(ai_results_map)} anomalies")
                 except Exception as e:
-                    # Fix 5b: Never surface raw exception to judges
-                    logger.warning(f"Gemini batch call failed: {e}")
+                    logger.warning(f"Groq response parse failed: {e}")
+
+            # -- Fall back to Gemini if Groq didn't cover everything --
+            if len(ai_results_map) < len(to_investigate):
+                client = _get_next_client()  # Draw ONCE (Fix 4)
+                if client:
+                    try:
+                        response = client.models.generate_content(
+                            model="gemini-3.5-flash",
+                            contents=batch_prompt,
+                            config={
+                                "system_instruction": SYSTEM_PROMPT,
+                                "temperature": 0.1,
+                            },
+                        )
+                        text = response.text.strip()
+                        # Strip markdown fences if present
+                        if text.startswith("```"):
+                            lines = text.split("\n")
+                            text = "\n".join(lines[1:-1])
+                        parsed = json.loads(text)
+                        if isinstance(parsed, dict):
+                            parsed = next(iter(parsed.values()))
+                        for item in parsed:
+                            idx = item.get("index", -1)
+                            if idx not in ai_results_map:
+                                ai_results_map[idx] = item
+                        logger.info(f"Gemini filled in {len(ai_results_map)} anomalies")
+                    except Exception as e:
+                        # Fix 5b: Never surface raw exception to judges
+                        logger.warning(f"Gemini batch call failed: {e}")
 
         if progress_callback:
             progress_callback(len(to_investigate), len(anomalies), "AI investigation complete")
