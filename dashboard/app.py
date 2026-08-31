@@ -143,13 +143,19 @@ if sample_500_btn:
     st.session_state.data_size = 500
 
 if uploaded_files and len(uploaded_files) >= 3:
-    import shutil
     upload_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "uploaded")
-    
-    # 1. Clear stale files to prevent cache or ground_truth pollution
-    if os.path.exists(upload_dir):
-        shutil.rmtree(upload_dir)
     os.makedirs(upload_dir, exist_ok=True)
+
+    # 1. Clear only known CSV files — avoids WinError 5 from rmtree on locked dirs
+    for stale in ["merchant_orders.csv", "razorpay_transactions.csv",
+                   "bank_statement.csv", "ground_truth.csv", "cached_ai_results.json"]:
+        stale_path = os.path.join(upload_dir, stale)
+        try:
+            if os.path.exists(stale_path):
+                os.remove(stale_path)
+        except OSError:
+            pass  # File locked — overwrite below will still work
+
     
     # 2. Save files using strict whitelisted names
     saved_count = 0
