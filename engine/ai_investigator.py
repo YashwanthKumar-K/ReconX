@@ -135,6 +135,49 @@ def _call_groq(prompt: str) -> Optional[str]:
     return None
 
 
+# ─── NVIDIA NIM Helper ────────────────────────────────────────────────────────
+
+def _call_nvidia(prompt: str) -> Optional[str]:
+    """Call NVIDIA NIM API (OpenAI compatible). Returns raw text or None."""
+    nvidia_keys_raw = _get_secret("NVIDIA_API_KEY")
+    if not nvidia_keys_raw:
+        return None
+
+    import urllib.request
+    import urllib.error
+
+    nvidia_keys = [k.strip() for k in nvidia_keys_raw.split(",") if k.strip()]
+    for key in nvidia_keys:
+        try:
+            url = "https://integrate.api.nvidia.com/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                # NVIDIA's free Llama 3.1 70B endpoint
+                "model": "meta/llama-3.1-70b-instruct",
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                # Not all NVIDIA models support strict json_object, but llama-3.1-70b-instruct usually handles it
+                "temperature": 0.1,
+            }
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers=headers,
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            logger.warning(f"NVIDIA call failed (key ending ...{key[-6:]}): {e}")
+            continue
+    return None
+
+
 # ─── Batch Investigation (Fix 1 + Fix 4) ─────────────────────────────────────
 
 def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] = None,
@@ -202,7 +245,30 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
                 except Exception as e:
                     logger.warning(f"Groq response parse failed: {e}")
 
-            # -- Fall back to Gemini if Groq didn't cover everything --
+            # -- Try NVIDIA NIM --
+            if len(ai_results_map) < len(to_investigate):
+                raw = _call_nvidia(batch_prompt)
+                if raw:
+                    try:
+                        # Strip markdown fences if present
+                        text = raw.strip()
+                        if text.startswith("```"):
+                            lines = text.split("\n")
+                            text = "\n".join(lines[1:-1])
+                            
+                        parsed = json.loads(text)
+                        if isinstance(parsed, dict):
+                            parsed = next(iter(parsed.values()))
+                        for item in parsed:
+                            idx = item.get("index", -1)
+                            if idx not in ai_results_map:
+                                ai_results_map[idx] = item
+                                provider_map[idx] = "NVIDIA (Llama 3.1 70B)"
+                        logger.info(f"NVIDIA filled in {len(ai_results_map)} anomalies")
+                    except Exception as e:
+                        logger.warning(f"NVIDIA response parse failed: {e}")
+
+            # -- Fall back to Gemini --
             if len(ai_results_map) < len(to_investigate):
                 client = _get_next_client()
                 if client:
