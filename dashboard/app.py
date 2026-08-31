@@ -282,12 +282,15 @@ if st.session_state.report is not None:
         resolved     = p1_matched + p2_matched + p3_matched
         unresolved   = total_orders - resolved
 
+        # Use total_anomalies for the exception bar (includes settlement + bank level)
+        total_anomalies = report["total_anomalies"]
+
         funnel_data = pd.DataFrame([
-            {"Phase": "Input Orders",             "Count": total_orders},
-            {"Phase": "Phase 1: Direct Match",    "Count": p1_matched},
-            {"Phase": "Phase 2: Settlement Match","Count": p1_matched + p2_matched},
-            {"Phase": "Phase 3: Subset-Sum Match","Count": p1_matched + p2_matched + p3_matched},
-            {"Phase": "Anomalies / Exceptions",   "Count": unresolved},
+            {"Phase": "Input Orders",                    "Count": total_orders},
+            {"Phase": "Phase 1: Direct Match",           "Count": p1_matched},
+            {"Phase": "Phase 2: Settlement Match",       "Count": p1_matched + p2_matched},
+            {"Phase": "Phase 3: Subset-Sum Match",       "Count": p1_matched + p2_matched + p3_matched},
+            {"Phase": "Total Anomalies / Exceptions",    "Count": total_anomalies},
         ])
 
         fig_funnel = go.Figure(go.Funnel(
@@ -308,7 +311,8 @@ if st.session_state.report is not None:
         # Summary math sanity check
         col_m, col_a = st.columns(2)
         col_m.success(f"**Resolved:** {resolved} / {total_orders} orders ({round(resolved/total_orders*100,1)}%)")
-        col_a.error(f"**Exceptions:** {unresolved} / {total_orders} orders ({round(unresolved/total_orders*100,1)}%)")
+        col_a.error(f"**Exceptions flagged:** {total_anomalies} total (order + settlement level)")
+
 
         # Phase stats table
         st.markdown("#### Phase Details")

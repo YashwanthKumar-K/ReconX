@@ -117,7 +117,86 @@ def run_phase3(
                     found = True
                     break
 
-    # Collect still unmatched items
+    # ── Direction 2: One settlement matched by multiple bank deposits ──────────
+    # This covers SPLIT_SETTLEMENT: bank splits one large payout into several deposits.
+    # Compute intermediate still-unmatched lists for Direction 2 to iterate over.
+    still_unmatched_rz = [
+        rz for rz in unmatched_razorpay_nets
+        if rz.get("id", rz.get("settlement_id", "")) not in matched_razorpay_ids
+    ]
+    still_unmatched_bank = [
+        dep for dep in unmatched_bank_deposits
+        if dep["utr_number"] not in matched_bank_utrs
+    ]
+
+    for rz in list(still_unmatched_rz):
+        rz_id = rz.get("id", rz.get("settlement_id", ""))
+        if rz_id in matched_razorpay_ids:
+            continue
+
+        target = rz["net_amount"]
+        rz_date = rz.get("settlement_date")
+
+        # Filter unmatched bank deposits by date window
+        bank_candidates = []
+        for dep in still_unmatched_bank:
+            if dep["utr_number"] in matched_bank_utrs:
+                continue
+            dep_date = dep["deposit_date"]
+            if rz_date and dep_date:
+                try:
+                    from datetime import date as dt_date
+                    if isinstance(rz_date, str):
+                        rz_date_parsed = dt_date.fromisoformat(rz_date)
+                    else:
+                        rz_date_parsed = rz_date
+                    if isinstance(dep_date, str):
+                        dep_date_parsed = dt_date.fromisoformat(dep_date)
+                    else:
+                        dep_date_parsed = dep_date
+                    if abs((dep_date_parsed - rz_date_parsed).days) > DATE_WINDOW_DAYS:
+                        continue
+                except (ValueError, TypeError):
+                    pass
+            bank_candidates.append(dep)
+
+        if not bank_candidates:
+            continue
+
+        # Try combinations of bank deposits that sum to the settlement
+        found = False
+        for subset_size in range(2, min(MAX_SUBSET_SIZE + 1, len(bank_candidates) + 1)):
+            if found:
+                break
+            for combo in combinations(bank_candidates, subset_size):
+                combo_total = sum(c["deposit_amount"] for c in combo)
+                diff = abs(combo_total - target)
+                if diff <= AMOUNT_TOLERANCE:
+                    utrs = [c["utr_number"] for c in combo]
+                    for utr in utrs:
+                        matched_bank_utrs.add(utr)
+                    matched_razorpay_ids.add(rz_id)
+                    matches.append({
+                        "type": "split_settlement_match",
+                        "settlement_id": rz_id,
+                        "settlement_amount": target,
+                        "matched_deposits": utrs,
+                        "matched_total": round(combo_total, 2),
+                        "difference": round(diff, 2),
+                        "order_ids": rz.get("order_ids", []),
+                        "subset_size": subset_size,
+                        "status": "matched",
+                        "phase": "Phase 3: Fuzzy/Subset-Sum Matching",
+                        "note": (
+                            f"Settlement {rz_id} (Rs.{target}) matched by {subset_size} "
+                            f"bank deposits totaling Rs.{round(combo_total, 2)} "
+                            f"(diff: Rs.{round(diff, 2)}). This is a SPLIT_SETTLEMENT."
+                        ),
+                    })
+                    found = True
+                    break
+
+    # Recompute still_unmatched after both directions
     still_unmatched_rz = [
         rz for rz in unmatched_razorpay_nets
         if rz.get("id", rz.get("settlement_id", "")) not in matched_razorpay_ids
