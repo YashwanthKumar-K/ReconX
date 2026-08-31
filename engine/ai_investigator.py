@@ -381,17 +381,38 @@ def _fallback_classification(anomaly: dict) -> dict:
             "needs_manual_review": False,
         },
         "AMOUNT_MISMATCH": {
-            "ai_explanation": "The merchant's recorded order amount does not match the Razorpay transaction amount.",
+            "ai_explanation": "The merchant's recorded order amount does not match the Razorpay transaction amount. This may be a currency conversion issue or a data entry error.",
+            "ai_classification": "AMOUNT_DISCREPANCY",
+            "ai_confidence": "medium",
+            "ai_suggested_resolution": "Compare original order details with payment gateway records and bank statement.",
+            "needs_manual_review": True,
+        },
+        "AMOUNT_DISCREPANCY": {
+            "ai_explanation": "The settled amount differs significantly from the expected order amount with no clear fee or refund explanation. This requires manual investigation.",
+            "ai_classification": "AMOUNT_DISCREPANCY",
+            "ai_confidence": "medium",
+            "ai_suggested_resolution": "Compare original order amount against Razorpay net amount and bank deposit. Check for manual adjustments or currency errors.",
+            "needs_manual_review": True,
+        },
+        "MISSING_RECORD": {
+            "ai_explanation": "This transaction is present in one ledger but missing from another. The payment may have failed silently, been processed through a different channel, or a record was not generated.",
+            "ai_classification": "MISSING_RECORD",
+            "ai_confidence": "medium",
+            "ai_suggested_resolution": "Verify with the customer whether payment was debited. Cross-reference with bank and Razorpay records on adjacent dates.",
+            "needs_manual_review": True,
+        },
+        "REQUIRES_MANUAL_REVIEW": {
+            "ai_explanation": "This anomaly could not be automatically classified. Multiple potential causes exist that require human judgement to resolve.",
             "ai_classification": "REQUIRES_MANUAL_REVIEW",
             "ai_confidence": "low",
-            "ai_suggested_resolution": "Compare original order details with payment gateway records and bank statement.",
+            "ai_suggested_resolution": "Finance team to manually investigate and reconcile this record.",
             "needs_manual_review": True,
         },
     }
 
     return explanations.get(anomaly_type, {
         "ai_explanation": f"Anomaly of type '{anomaly_type}' detected. Deterministic rules could not classify this automatically.",
-        "ai_classification": "REQUIRES_MANUAL_REVIEW",
+        "ai_classification": anomaly_type if anomaly_type else "REQUIRES_MANUAL_REVIEW",
         "ai_confidence": "low",
         "ai_suggested_resolution": "Manual review required by finance team.",
         "needs_manual_review": True,
