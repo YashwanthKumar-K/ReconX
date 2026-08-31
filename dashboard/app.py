@@ -5,6 +5,7 @@ Single-page interactive dashboard for the reconciliation engine.
 """
 import sys
 import os
+import json
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -568,6 +569,47 @@ if st.session_state.report is not None:
         f"| {report['total_merchant_orders']} orders processed "
         f"| Algorithms do the math, AI explains the why.*"
     )
+
+    # ─── Export ──────────────────────────────────────────────────────
+    if "report" in st.session_state and st.session_state.report:
+        st.markdown("### Export Results")
+        exp_col1, exp_col2 = st.columns(2)
+
+        # CSV anomaly report
+        with exp_col1:
+            anomaly_rows = [{
+                "order_id":             a.get("order_id", ""),
+                "anomaly_type":         a.get("anomaly_type", ""),
+                "ai_classification":    a.get("ai_classification", ""),
+                "confidence":           a.get("ai_confidence", ""),
+                "explanation":          a.get("ai_explanation", ""),
+                "suggested_resolution": a.get("ai_suggested_resolution", ""),
+                "needs_manual_review":  a.get("needs_manual_review", True),
+                "detected_in_phase":    a.get("detected_in_phase", ""),
+            } for a in report["anomalies"]]
+
+            import io as _io
+            csv_buf = _io.StringIO()
+            pd.DataFrame(anomaly_rows).to_csv(csv_buf, index=False)
+            st.download_button(
+                label="📥 Download Anomaly Report (CSV)",
+                data=csv_buf.getvalue(),
+                file_name="reconx_anomaly_report.csv",
+                mime="text/csv",
+                use_container_width=True,
+                help="All flagged anomalies with AI explanations and suggested resolutions",
+            )
+
+        # JSON full report
+        with exp_col2:
+            st.download_button(
+                label="📥 Download Full Report (JSON)",
+                data=json.dumps(report, indent=2, default=str),
+                file_name="reconx_full_report.json",
+                mime="application/json",
+                use_container_width=True,
+                help="Complete reconciliation report with all phase stats, matched results, and scores",
+            )
 
 
 # ─── Footer ──────────────────────────────────────────────────────────────────

@@ -76,17 +76,24 @@ For EACH anomaly in the input array, respond with a JSON array of objects in the
 each shaped like:
 {
     "index": <int matching input index>,
-    "root_cause": "One of: TIMING_MISMATCH, PARTIAL_REFUND, SPLIT_SETTLEMENT, DUPLICATE_PAYMENT, MISSING_RECORD, REQUIRES_MANUAL_REVIEW",
+    "root_cause": "One of: TIMING_MISMATCH, PARTIAL_REFUND, FEE_DISCREPANCY, AMOUNT_DISCREPANCY, SPLIT_SETTLEMENT, DUPLICATE_PAYMENT, MISSING_RECORD, REQUIRES_MANUAL_REVIEW",
     "confidence": "One of: high, medium, low",
     "explanation": "Clear human-readable explanation. Reference specific dates, amounts, and IDs.",
     "suggested_resolution": "What action should be taken to resolve this",
     "needs_manual_review": true or false
 }
 
+FEE/TAX DIAGNOSTIC RULE (CRITICAL — apply before labelling any net-amount shortfall):
+  Standard Razorpay rates: fee_rate = 2.0%, GST on fee = 18%.
+  expected_net = amount - (amount × 0.02) - (amount × 0.02 × 0.18)
+  • If actual net_amount ≈ expected_net → math is correct, shortfall is a real refund → PARTIAL_REFUND
+  • If actual net_amount ≠ expected_net AND no refund evidence → fee/tax rate is wrong → FEE_DISCREPANCY
+  • If amounts differ significantly with no clear fee/refund pattern → AMOUNT_DISCREPANCY
+
 IMPORTANT:
 - Use Rs. prefix for amounts (not rupee symbol)
 - Reference specific dates and IDs from the context
-- Common causes: midnight cutoff timing, partial refunds, split settlements, network delays
+- Common causes: midnight cutoff timing, partial refunds, split settlements, network delays, fee-rate changes
 - Respond ONLY with a valid JSON array, no extra text, no markdown fences
 """
 
