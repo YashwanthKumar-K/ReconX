@@ -83,12 +83,7 @@ each shaped like:
     "needs_manual_review": true or false
 }
 
-FEE/TAX DIAGNOSTIC RULE (CRITICAL — apply before labelling any net-amount shortfall):
-  Standard Razorpay rates: fee_rate = 2.0%, GST on fee = 18%.
-  expected_net = amount - (amount × 0.02) - (amount × 0.02 × 0.18)
-  • If actual net_amount ≈ expected_net → math is correct, shortfall is a real refund → PARTIAL_REFUND
-  • If actual net_amount ≠ expected_net AND no refund evidence → fee/tax rate is wrong → FEE_DISCREPANCY
-  • If amounts differ significantly with no clear fee/refund pattern → AMOUNT_DISCREPANCY
+CRITICAL RULE: If the `net_amount` is lower than the original `amount`, you MUST calculate the expected tax and fee. If the actual deducted tax/fee is higher than the standard 2% fee + 18% GST, you must label it FEE_DISCREPANCY, NOT PARTIAL_REFUND. If the math perfectly matches standard fees but the net is still short, ONLY THEN assume PARTIAL_REFUND.
 
 IMPORTANT:
 - Use Rs. prefix for amounts (not rupee symbol)
