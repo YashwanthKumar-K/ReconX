@@ -11,9 +11,10 @@ from datetime import timedelta
 from itertools import combinations
 from typing import Tuple
 
-MAX_SUBSET_SIZE = 4  # Cap at 4 items per combination
+MAX_SUBSET_SIZE = 3  # Realistic split payouts are at most 2-3 tranches
 DATE_WINDOW_DAYS = 2  # Only consider items within ±2 days
 AMOUNT_TOLERANCE = 2.0  # ₹2 tolerance for matching
+MAX_CANDIDATES = 15  # Prune to top 15 closest candidates to avoid combinatorial explosion
 
 
 def run_phase3(
@@ -75,6 +76,10 @@ def run_phase3(
 
         if not candidates:
             continue
+
+        # Prune candidates to the closest subset by amount
+        if len(candidates) > MAX_CANDIDATES:
+            candidates = sorted(candidates, key=lambda c: abs(c["net_amount"] - target))[:MAX_CANDIDATES]
 
         # Try combinations of size 1 to MAX_SUBSET_SIZE
         found = False
@@ -162,6 +167,10 @@ def run_phase3(
 
         if not bank_candidates:
             continue
+
+        # Prune bank candidates to the closest subset
+        if len(bank_candidates) > MAX_CANDIDATES:
+            bank_candidates = sorted(bank_candidates, key=lambda c: abs(c["deposit_amount"] - target))[:MAX_CANDIDATES]
 
         # Try combinations of bank deposits that sum to the settlement
         found = False
