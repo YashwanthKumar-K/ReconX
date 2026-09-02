@@ -685,24 +685,34 @@ if st.session_state.report is not None:
             # AI classification details
             if scores.get("ai_details"):
                 st.markdown("#### Classification Details")
-                details_df = pd.DataFrame(scores["ai_details"])
-                st.dataframe(details_df, width='stretch')
+                try:
+                    details_df = pd.DataFrame(scores["ai_details"])
+                    st.dataframe(details_df, width='stretch', height=280)
+                except Exception as e:
+                    st.warning(f"Could not format classification details: {e}")
 
             # Undetected anomalies
             if scores.get("undetected_anomalies"):
                 st.markdown("#### Undetected Anomalies (Honest Exception List)")
-                st.warning(f"{len(scores['undetected_anomalies'])} anomalies were not detected by the engine:")
-                for u in scores["undetected_anomalies"]:
-                    st.write(f"- **{u['order_id']}**: {u['missed_anomaly_type']}")
+                st.warning(f"{len(scores['undetected_anomalies'])} ground-truth anomalies were not detected by the engine:")
+                try:
+                    undetected_df = pd.DataFrame(scores["undetected_anomalies"])
+                    st.dataframe(undetected_df, width='stretch', height=200)
+                except Exception:
+                    for u in scores["undetected_anomalies"][:20]:
+                        st.write(f"- **{u.get('order_id', '')}**: {u.get('missed_anomaly_type', '')}")
             else:
                 st.success("All injected anomalies were detected!")
 
             # Confusion matrix
             if scores.get("confusion_matrix"):
                 st.markdown("#### Confusion Matrix")
-                cm = scores["confusion_matrix"]
-                cm_df = pd.DataFrame(cm).fillna(0).astype(int)
-                st.dataframe(cm_df, width='stretch')
+                try:
+                    cm = scores["confusion_matrix"]
+                    cm_df = pd.DataFrame(cm).fillna(0).astype(int)
+                    st.dataframe(cm_df, width='stretch')
+                except Exception:
+                    st.dataframe(pd.DataFrame(scores.get("confusion_matrix", {})), width='stretch')
 
 
     # ─── Performance ──────────────────────────────────────────────────
@@ -718,41 +728,59 @@ if st.session_state.report is not None:
         st.markdown("### Export Results")
         exp_col1, exp_col2 = st.columns(2)
 
-        # CSV anomaly report
-        with exp_col1:
-            anomaly_rows = [{
-                "order_id":             a.get("order_id", ""),
-                "anomaly_type":         a.get("anomaly_type", ""),
-                "ai_classification":    a.get("ai_classification", ""),
-                "confidence":           a.get("ai_confidence", ""),
-                "explanation":          a.get("ai_explanation", ""),
-                "suggested_resolution": a.get("ai_suggested_resolution", ""),
-                "needs_manual_review":  a.get("needs_manual_review", True),
-                "detected_in_phase":    a.get("detected_in_phase", ""),
-            } for a in report["anomalies"]]
+        try:
+            # CSV anomaly report
+            with exp_col1:
+                anomaly_rows = [{
+                    "order_id":             a.get("order_id", ""),
+                    "anomaly_type":         a.get("anomaly_type", ""),
+                    "ai_classification":    a.get("ai_classification", ""),
+                    "confidence":           a.get("ai_confidence", ""),
+                    "explanation":          a.get("ai_explanation", ""),
+                    "suggested_resolution": a.get("ai_suggested_resolution", ""),
+                    "needs_manual_review":  a.get("needs_manual_review", True),
+                    "detected_in_phase":    a.get("detected_in_phase", ""),
+                } for a in report.get("anomalies", [])]
 
-            import io as _io
-            csv_buf = _io.StringIO()
-            pd.DataFrame(anomaly_rows).to_csv(csv_buf, index=False)
-            st.download_button(
-                label="📥 Download Anomaly Report (CSV)",
-                data=csv_buf.getvalue(),
-                file_name="reconx_anomaly_report.csv",
-                mime="text/csv",
-                use_container_width=True,
-                help="All flagged anomalies with AI explanations and suggested resolutions",
-            )
+                import io as _io
+                csv_buf = _io.StringIO()
+                pd.DataFrame(anomaly_rows).to_csv(csv_buf, index=False)
+                st.download_button(
+                    label="Download Anomaly Report (CSV)",
+                    data=csv_buf.getvalue(),
+                    file_name="reconx_anomaly_report.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    help="All flagged anomalies with AI explanations and suggested resolutions",
+                )
 
-        # JSON full report
-        with exp_col2:
-            st.download_button(
-                label="📥 Download Full Report (JSON)",
-                data=json.dumps(report, indent=2, default=str),
-                file_name="reconx_full_report.json",
-                mime="application/json",
-                use_container_width=True,
-                help="Complete reconciliation report with all phase stats, matched results, and scores",
-            )
+            # JSON summary report (lightweight for large data)
+            with exp_col2:
+                # Keep full export clean and serializable
+                clean_report = {
+                    "total_merchant_orders": report.get("total_merchant_orders", 0),
+                    "total_razorpay_transactions": report.get("total_razorpay_transactions", 0),
+                    "total_bank_deposits": report.get("total_bank_deposits", 0),
+                    "total_matched": report.get("total_matched", 0),
+                    "total_anomalies": report.get("total_anomalies", 0),
+                    "match_rate": report.get("match_rate", 0),
+                    "elapsed_seconds": report.get("elapsed_seconds", 0),
+                    "phase_stats": report.get("phase_stats", []),
+                    "scores": report.get("scores", {}),
+                    "anomalies": report.get("anomalies", []),
+                    "settlement_matches": report.get("settlement_matches", []),
+                }
+                json_data = json.dumps(clean_report, indent=2, default=str)
+                st.download_button(
+                    label="Download Summary Report (JSON)",
+                    data=json_data,
+                    file_name="reconx_full_report.json",
+                    mime="application/json",
+                    use_container_width=True,
+                    help="Complete reconciliation report with phase stats, scores, and all anomaly records",
+                )
+        except Exception as e:
+            st.error(f"Error generating export files: {e}")
 
 
 # ─── Footer ──────────────────────────────────────────────────────────────────
