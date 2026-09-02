@@ -193,9 +193,15 @@ def run_reconciliation(
         if verbose:
             print("\n[SCORING] Evaluating against ground truth...")
         scores = score_results(enriched_anomalies, ground_truth_df, matched_order_ids)
+        if not use_ai:
+            scores["ai_accuracy"] = None
+            scores["ai_correct"] = 0
+            scores["ai_total"] = 0
+            scores["ai_details"] = []
         if verbose:
             print(f"  Engine detection accuracy: {scores['engine_accuracy']}%")
-            print(f"  AI classification accuracy: {scores['ai_accuracy']}% ({scores['ai_correct']}/{scores['ai_total']})")
+            if use_ai:
+                print(f"  AI classification accuracy: {scores['ai_accuracy']}% ({scores['ai_correct']}/{scores['ai_total']})")
             if scores["undetected_anomalies"]:
                 print(f"  Undetected anomalies: {len(scores['undetected_anomalies'])}")
                 for u in scores["undetected_anomalies"]:
@@ -231,6 +237,7 @@ def run_reconciliation(
         "subset_matches": p3_matches,
         "anomalies": enriched_anomalies,
         "scores": scores,
+        "use_ai": use_ai,
         "elapsed_seconds": elapsed,
     }
 

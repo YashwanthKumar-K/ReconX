@@ -376,11 +376,15 @@ if st.session_state.report is not None:
         st.metric("Engine Accuracy", f"{engine_acc}%" if engine_acc is not None else "N/A",
                   help="Only available when ground_truth.csv is present")
     with c5:
-        ai_acc = report["scores"]["ai_accuracy"]
-        ai_label = f"{ai_acc}%" if ai_acc is not None else "N/A"
-        ai_delta = f"{report['scores']['ai_correct']}/{report['scores']['ai_total']}" if ai_acc is not None else None
-        st.metric("AI Accuracy", ai_label, delta=ai_delta,
-                  help="Only available when ground_truth.csv is present")
+        if not report.get("use_ai", False):
+            st.metric("AI Accuracy", "Disabled", delta=None,
+                      help="AI Investigation (Phase 4) was disabled for this run")
+        else:
+            ai_acc = report["scores"].get("ai_accuracy")
+            ai_label = f"{ai_acc}%" if ai_acc is not None else "N/A"
+            ai_delta = f"{report['scores'].get('ai_correct', 0)}/{report['scores'].get('ai_total', 0)}" if ai_acc is not None else None
+            st.metric("AI Accuracy", ai_label, delta=ai_delta,
+                      help="Only available when ground_truth.csv is present and AI Investigation is enabled")
 
     st.markdown("---")
 
@@ -649,29 +653,36 @@ if st.session_state.report is not None:
 
             with col_acc2:
                 st.markdown("#### AI Classification Accuracy")
-                fig_ai = go.Figure(go.Indicator(
-                    mode="gauge+number",
-                    value=scores.get("ai_accuracy", 0.0),
-                    title={"text": "AI Accuracy %"},
-                    gauge={
-                        "axis": {"range": [0, 100]},
-                        "bar": {"color": "#3b82f6"},
-                        "bgcolor": "#141a26",
-                        "steps": [
-                            {"range": [0, 60], "color": "rgba(239, 68, 68, 0.2)"},
-                            {"range": [60, 85], "color": "rgba(245, 158, 11, 0.2)"},
-                            {"range": [85, 100], "color": "rgba(59, 130, 246, 0.2)"},
-                        ],
-                    },
-                ))
-                fig_ai.update_layout(
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    font=dict(color="white"),
-                    height=240,
-                    margin=dict(l=20, r=20, t=40, b=20),
-                )
-                st.plotly_chart(fig_ai, width='stretch')
-                st.write(f"Correctly diagnosed: **{scores.get('ai_correct', 0)}/{scores.get('ai_total', 0)}** anomalies")
+                if not report.get("use_ai", False):
+                    st.info(
+                        "**AI Investigation (Phase 4) was disabled for this run.**\n\n"
+                        "To evaluate LLM root-cause classification accuracy against the ground truth answer key, "
+                        "check **'Enable AI Investigation (Phase 4)'** and click Reconcile."
+                    )
+                else:
+                    fig_ai = go.Figure(go.Indicator(
+                        mode="gauge+number",
+                        value=scores.get("ai_accuracy", 0.0),
+                        title={"text": "AI Accuracy %"},
+                        gauge={
+                            "axis": {"range": [0, 100]},
+                            "bar": {"color": "#3b82f6"},
+                            "bgcolor": "#141a26",
+                            "steps": [
+                                {"range": [0, 60], "color": "rgba(239, 68, 68, 0.2)"},
+                                {"range": [60, 85], "color": "rgba(245, 158, 11, 0.2)"},
+                                {"range": [85, 100], "color": "rgba(59, 130, 246, 0.2)"},
+                            ],
+                        },
+                    ))
+                    fig_ai.update_layout(
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        font=dict(color="white"),
+                        height=240,
+                        margin=dict(l=20, r=20, t=40, b=20),
+                    )
+                    st.plotly_chart(fig_ai, width='stretch')
+                    st.write(f"Correctly diagnosed: **{scores.get('ai_correct', 0)}/{scores.get('ai_total', 0)}** anomalies")
 
             if scores.get("ai_details"):
                 st.markdown("#### Ground Truth vs AI Predictions")
