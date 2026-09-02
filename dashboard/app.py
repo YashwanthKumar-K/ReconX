@@ -119,14 +119,14 @@ col_load1, col_load2, col_load3 = st.columns([2, 2, 2])
 with col_load1:
     sample_btn = st.button(
         "📂 Load Sample Data (50 orders)",
-        use_container_width=True,
+        width='stretch',
         type="primary",
     )
 
 with col_load2:
     sample_500_btn = st.button(
         "📊 Generate 500 Orders",
-        use_container_width=True,
+        width='stretch',
     )
 
 with col_load3:
@@ -220,7 +220,7 @@ if data_dir or "data_dir" in st.session_state:
             help="Load pre-computed AI results instantly. Run once with Live AI to build the cache."
         )
     with col_r3:
-        reconcile_btn = st.button("RECONCILE", type="primary", use_container_width=True)
+        reconcile_btn = st.button("RECONCILE", type="primary", width='stretch')
 
     if reconcile_btn:
         st.session_state.running = True
@@ -380,7 +380,7 @@ if st.session_state.report is not None:
             height=400,
             margin=dict(l=20, r=20, t=20, b=20),
         )
-        st.plotly_chart(fig_funnel, use_container_width=True)
+        st.plotly_chart(fig_funnel, width='stretch')
 
         # Summary — math must check out: matched + anomalies = total_orders
         col_m, col_a, col_s = st.columns(3)
@@ -416,7 +416,7 @@ if st.session_state.report is not None:
             available_cols = [c for c in display_cols if c in matched_df.columns]
             st.dataframe(
                 matched_df[available_cols],
-                use_container_width=True,
+                width='stretch',
                 height=400,
             )
         else:
@@ -426,15 +426,38 @@ if st.session_state.report is not None:
         st.markdown("### Anomaly Investigation Panel")
 
         if report["anomalies"]:
-            for i, anomaly in enumerate(report["anomalies"]):
+            all_anomalies = report["anomalies"]
+            num_anomalies = len(all_anomalies)
+
+            # Summary table (always shown — lightweight)
+            summary_rows = [{
+                "Order ID": a.get("order_id", ""),
+                "Type": a.get("ai_classification", a.get("anomaly_type", "")),
+                "Confidence": a.get("ai_confidence", ""),
+                "Provider": a.get("ai_provider", ""),
+                "Phase": a.get("detected_in_phase", ""),
+            } for a in all_anomalies]
+            st.dataframe(pd.DataFrame(summary_rows), width='stretch', height=300)
+
+            # Paginated detail view
+            PAGE_SIZE = 25
+            total_pages = max(1, (num_anomalies + PAGE_SIZE - 1) // PAGE_SIZE)
+            page = st.number_input(
+                f"Page (1–{total_pages}) — {num_anomalies} anomalies total",
+                min_value=1, max_value=total_pages, value=1, step=1
+            )
+            start_idx = (page - 1) * PAGE_SIZE
+            end_idx = min(start_idx + PAGE_SIZE, num_anomalies)
+
+            for i in range(start_idx, end_idx):
+                anomaly = all_anomalies[i]
                 confidence = anomaly.get("ai_confidence", "low")
-                badge_class = f"badge-{confidence}"
 
                 with st.expander(
                     f"{'🔴' if confidence == 'high' else '🟡' if confidence == 'medium' else '🟢'} "
                     f"{anomaly.get('order_id', 'Unknown')} — "
                     f"{anomaly.get('ai_classification', anomaly.get('anomaly_type', 'Unknown'))}",
-                    expanded=(i == 0),
+                    expanded=(i == start_idx),
                 ):
                     col_l, col_r = st.columns([1, 1])
 
@@ -476,7 +499,34 @@ if st.session_state.report is not None:
         st.markdown("### Settlement Batch Matching")
 
         if report.get("settlement_matches"):
-            for sm in report["settlement_matches"]:
+            all_settlements = report["settlement_matches"]
+            num_settlements = len(all_settlements)
+
+            # Summary table (lightweight)
+            setl_summary = [{
+                "Settlement ID": sm.get("settlement_id", ""),
+                "Expected (₹)": f"{sm.get('expected_amount', 0):,.2f}",
+                "Bank Deposit (₹)": f"{sm.get('bank_amount', 0):,.2f}",
+                "UTR": sm.get("utr_number", ""),
+                "Orders": sm.get("order_count", 0),
+                "Status": sm.get("status", ""),
+            } for sm in all_settlements]
+            st.dataframe(pd.DataFrame(setl_summary), width='stretch', height=300)
+
+            # Paginated detail view
+            SETL_PAGE = 25
+            setl_pages = max(1, (num_settlements + SETL_PAGE - 1) // SETL_PAGE)
+            if setl_pages > 1:
+                setl_page = st.number_input(
+                    f"Page (1–{setl_pages}) — {num_settlements} settlements total",
+                    min_value=1, max_value=setl_pages, value=1, step=1, key="setl_page"
+                )
+            else:
+                setl_page = 1
+            s_start = (setl_page - 1) * SETL_PAGE
+            s_end = min(s_start + SETL_PAGE, num_settlements)
+
+            for sm in all_settlements[s_start:s_end]:
                 status_icon = "✅" if sm.get("status") == "matched" else "⚠️"
                 with st.expander(
                     f"{status_icon} Settlement {sm.get('settlement_id', 'N/A')} — "
@@ -493,16 +543,21 @@ if st.session_state.report is not None:
                         st.write(f"**Deposit Date:** {sm.get('deposit_date', 'N/A')}")
                         if sm.get("note"):
                             st.write(f"**Note:** {sm['note']}")
-                    st.write(f"**Orders:** {', '.join(sm.get('order_ids', []))}")
+                    # Truncate order list for readability
+                    order_ids = sm.get("order_ids", [])
+                    if len(order_ids) > 20:
+                        st.write(f"**Orders ({len(order_ids)}):** {', '.join(order_ids[:20])}, ...")
+                    else:
+                        st.write(f"**Orders:** {', '.join(order_ids)}")
         else:
             st.info("No settlement data available.")
 
     with tab_accuracy:
         st.markdown("### Accuracy Report — Ground Truth Validation")
 
-        scores = report["scores"]
+        scores = report.get("scores") or {}
 
-        if scores.get("engine_accuracy") is None:
+        if not scores or scores.get("engine_accuracy") is None:
             st.info(
                 "**Ground truth not available for uploaded data.**\n\n"
                 "Accuracy scoring requires a `ground_truth.csv` answer key. "
@@ -540,7 +595,7 @@ if st.session_state.report is not None:
                     height=250,
                     margin=dict(l=20, r=20, t=40, b=20),
                 )
-                st.plotly_chart(fig_eng, use_container_width=True)
+                st.plotly_chart(fig_eng, width='stretch')
                 ec = scores.get("engine_correct", "?")
                 et = scores.get("engine_total", "?")
                 st.write(f"Correctly classified: **{ec}/{et}** records")
@@ -568,14 +623,14 @@ if st.session_state.report is not None:
                     height=250,
                     margin=dict(l=20, r=20, t=40, b=20),
                 )
-                st.plotly_chart(fig_ai, use_container_width=True)
+                st.plotly_chart(fig_ai, width='stretch')
                 st.write(f"Correctly classified: **{scores['ai_correct']}/{scores['ai_total']}** anomalies")
 
             # AI classification details
             if scores.get("ai_details"):
                 st.markdown("#### Classification Details")
                 details_df = pd.DataFrame(scores["ai_details"])
-                st.dataframe(details_df, use_container_width=True)
+                st.dataframe(details_df, width='stretch')
 
             # Undetected anomalies
             if scores.get("undetected_anomalies"):
@@ -591,7 +646,7 @@ if st.session_state.report is not None:
                 st.markdown("#### Confusion Matrix")
                 cm = scores["confusion_matrix"]
                 cm_df = pd.DataFrame(cm).fillna(0).astype(int)
-                st.dataframe(cm_df, use_container_width=True)
+                st.dataframe(cm_df, width='stretch')
 
 
     # ─── Performance ──────────────────────────────────────────────────
@@ -628,7 +683,7 @@ if st.session_state.report is not None:
                 data=csv_buf.getvalue(),
                 file_name="reconx_anomaly_report.csv",
                 mime="text/csv",
-                use_container_width=True,
+                width='stretch',
                 help="All flagged anomalies with AI explanations and suggested resolutions",
             )
 
@@ -639,7 +694,7 @@ if st.session_state.report is not None:
                 data=json.dumps(report, indent=2, default=str),
                 file_name="reconx_full_report.json",
                 mime="application/json",
-                use_container_width=True,
+                width='stretch',
                 help="Complete reconciliation report with all phase stats, matched results, and scores",
             )
 
