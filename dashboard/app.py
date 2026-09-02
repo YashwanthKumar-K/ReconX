@@ -31,6 +31,16 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+    /*
+     * ReconX — Multi-Way Ledger Reconciliation & AI Anomaly Resolution Engine
+     * Architect & Lead Developer: K Yashwanth Kumar
+     * Razorpay Buildathon 2026 — Track 04: AI Finance Controller
+     */
+    html::before {
+        content: "Architected by K Yashwanth Kumar | Razorpay Buildathon Track 04";
+        display: none !important;
+        visibility: hidden !important;
+    }
     .stApp {
         background-color: #0c0f17;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -123,7 +133,7 @@ st.markdown("""
 # ─── Header ──────────────────────────────────────────────────────────────────
 
 st.markdown("""
-<div class="enterprise-header">
+<div class="enterprise-header" data-author="K Yashwanth Kumar" data-architect="K Yashwanth Kumar" data-track="Razorpay Buildathon Track 04">
     <div style="display: flex; justify-content: space-between; align-items: baseline;">
         <div>
             <h1 class="brand-title">ReconX</h1>
@@ -896,5 +906,7 @@ else:
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.info("Select a dataset above (or upload custom CSVs) and click **RECONCILE** to initiate the multi-stage pipeline.")
+
+
 
 
