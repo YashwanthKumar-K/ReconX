@@ -4,6 +4,12 @@
   <p><i>Architected by <b>K Yashwanth Kumar</b> for the Razorpay AI Buildathon — Track 04: AI Finance Controller</i></p>
 
   <p>
+    <a href="https://reconxcontroller.streamlit.app/">
+      <img src="https://img.shields.io/badge/Live%20Demo-reconxcontroller.streamlit.app-FF4B4B?style=for-the-badge&logo=streamlit" alt="Live Demo">
+    </a>
+  </p>
+
+  <p>
     <img src="https://img.shields.io/badge/Python-3.11+-blue.svg" alt="Python 3.11+">
     <img src="https://img.shields.io/badge/Streamlit-1.40+-FF4B4B.svg" alt="Streamlit">
     <img src="https://img.shields.io/badge/AI%20Stack-Groq%20%7C%20NVIDIA%20NIM%20%7C%20Gemini-green.svg" alt="AI Stack">
@@ -11,6 +17,8 @@
     <img src="https://img.shields.io/badge/AI%20Diagnosis%20Accuracy-100.0%25-success.svg" alt="AI Accuracy">
     <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
   </p>
+
+  <p>🌐 <b>Live Production Dashboard:</b> <a href="https://reconxcontroller.streamlit.app/"><b>https://reconxcontroller.streamlit.app/</b></a></p>
 </div>
 
 > **Deterministic arithmetic matching for verifiable ledger validation (95%), paired with multi-provider LLM contextual reasoning for root-cause exception analysis (5%).**
@@ -186,9 +194,13 @@ ReconX/
 
 ## 🚀 Easy Installation & Running Across Any Device
 
-Choose whichever method best matches your setup:
+### 🌐 Option 1: Live Cloud Web Application (Instant Access)
+No installation required. Access the live production deployment directly in your browser:  
+👉 **[https://reconxcontroller.streamlit.app/](https://reconxcontroller.streamlit.app/)**
 
-### Method A: One-Click Launchers (Zero Manual Setup)
+---
+
+### Option 2: One-Click Desktop Launchers (Zero Manual Setup)
 
 #### 🪟 On Windows:
 Simply double-click **`run.bat`** (or execute in PowerShell/CMD):
