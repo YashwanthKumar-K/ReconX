@@ -160,10 +160,10 @@ with st.sidebar:
     st.markdown("### AI Inference Stack")
     st.markdown(
         """
-        - **Primary:** Groq (Llama 3 70B)
-        - **Secondary:** NVIDIA NIM (Llama 3.1 70B)
-        - **Tertiary:** Google Gemini 1.5 Flash
-        - **Fallback:** Deterministic Classifier
+        - **Primary:** Groq (`GPT-OSS 120B`)
+        - **Secondary:** NVIDIA NIM (`Llama 3.1 70B`)
+        - **Tertiary:** Google GenAI (`Gemini 3.6 Flash`)
+        - **Fallback:** Deterministic Rule Classifier
         """
     )
     st.markdown("---")

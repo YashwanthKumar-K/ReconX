@@ -13,9 +13,9 @@
   </p>
 </div>
 
-> **"Algorithms for the arithmetic (95%). AI for the reasoning (5%). Both with mathematically proven accuracy."**
+> **Deterministic arithmetic matching for verifiable ledger validation (95%), paired with multi-provider LLM contextual reasoning for root-cause exception analysis (5%).**
 
-ReconX is an enterprise-grade financial reconciliation system engineered to validate, audit, and reconcile transactions across three disparate financial sources of truth: **Merchant ERP/Order Records**, **Razorpay Payment Gateway Ledgers**, and **Nodal Bank Statement Deposits**.
+ReconX is a high-throughput financial reconciliation system engineered to validate, audit, and reconcile transactions across three disparate financial sources of truth: **Merchant ERP/Order Records**, **Razorpay Payment Gateway Ledgers**, and **Nodal Bank Statement Deposits**.
 
 When discrepancies arise, ReconX deploys an asynchronous, multi-key load-balanced AI ensemble (Groq, NVIDIA NIM, and Google Gemini) to investigate root causes, generate audit explanations, and propose actionable settlement resolutions.
 
@@ -119,18 +119,23 @@ Edge cases that pass through the deterministic filters undergo automated root-ca
 
 ---
 
-## 📈 Enterprise Benchmarks & Performance Metrics
+## 📈 Performance Benchmarks & Methodology
 
-ReconX was benchmarked on standard datasets up to **8,000 orders** (generated via `engine.synthetic_data_generator`) as well as production merchant exports:
+ReconX was evaluated across reproducible test suites ranging from 100 to 8,000 orders generated using our built-in fault-injection harness (`engine.synthetic_data_generator`), as well as real-world merchant export files:
 
-| Metric | Sample (100 Orders) | Mid-Scale (1,000 Orders) | Large-Scale (8,000 Orders) |
+| Metric | Sample Suite (100 Orders) | Benchmark Suite (1,000 Orders) | High-Volume Suite (8,000 Orders) |
 | :--- | :--- | :--- | :--- |
-| **Total Transactions Processed** | 100 merchant + 100 gateway | 1,000 merchant + 1,000 gateway | 8,000 merchant + 8,000 gateway + 966 deposits |
+| **Total Ledger Volume** | 100 merchant + 100 gateway | 1,000 merchant + 1,000 gateway | 8,000 merchant + 8,000 gateway + 966 deposits |
 | **End-to-End Pipeline Runtime** | **0.84 seconds** | **2.91 seconds** | **11.46 seconds** |
 | **Phase 1 Match Rate** | 90.0% | 90.3% | 90.2% |
 | **Phase 3 Subset-Sum Latency** | $< 0.01\text{s}$ | $0.02\text{s}$ | **0.05 seconds** |
 | **Engine Detection Accuracy** | **100.0%** | **98.4%** | **98.1%** |
-| **AI Classification Accuracy** | **100.0%** (10/10) | **100.0%** (97/97) | **100.0%** (794/794) |
+| **AI Classification Accuracy (Controlled Suite)** | **100.0%** (10/10) | **100.0%** (97/97) | **100.0%** (794/794) |
+
+#### 🔬 Benchmark Methodology & Integrity Note:
+- **How anomalies are evaluated:** The synthetic generator injects 8 standard industry reconciliation faults (`TIMING_MISMATCH`, `SPLIT_SETTLEMENT`, `PARTIAL_REFUND`, `DUPLICATE_PAYMENT`, `FEE_DISCREPANCY`, `AMOUNT_DISCREPANCY`, `MISSING_RECORD`) into ground truth labels.
+- **Why AI classification accuracy is high on this suite:** The engine pre-computes structured mathematical deltas (exact amount variance, expected vs actual MDR fee, duplicate payment counts, settlement date drift). Because the 120B model receives clean quantitative delta signals rather than ambiguous raw text, root-cause classification aligns cleanly with canonical labels.
+- **On Unlabelled / Custom Merchant Data:** On real-world datasets without ground truth (e.g. 5,000-order ERP exports), the deterministic engine isolates ~90.2% clean matches, while the remaining ~9.8% anomalies are routed to the AI cascade to generate root-cause hypotheses and triage recommendations for controller review.
 
 ---
 
