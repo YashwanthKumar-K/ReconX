@@ -208,21 +208,29 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
         if progress_callback:
             progress_callback(0, len(anomalies), f"Sending {len(to_investigate)} anomalies to AI...")
 
-        # Build batch prompt with all anomalies
+        # Build compact batch prompt with essential context
         batch_input = []
         for j, a in enumerate(to_investigate):
-            nearby = nearby_transactions_map.get(a.get("order_id")) if nearby_transactions_map else None
+            m_data = a.get("merchant_data") or {}
+            r_data = a.get("razorpay_data") or {}
+            
             entry = {
                 "index": j,
                 "order_id": a.get("order_id"),
-                "anomaly_type": a.get("anomaly_type"),
-                "merchant_data": a.get("merchant_data"),
-                "razorpay_data": a.get("razorpay_data"),
-                "bank_data": a.get("bank_data"),
+                "detected_type": a.get("anomaly_type"),
                 "note": a.get("note"),
             }
-            if nearby:
-                entry["nearby_transactions"] = nearby[:3]
+            if isinstance(m_data, dict):
+                entry["merchant_amount"] = m_data.get("amount")
+                entry["order_date"] = m_data.get("order_date")
+            if isinstance(r_data, dict):
+                entry["razorpay_amount"] = r_data.get("amount")
+                entry["net_amount"] = r_data.get("net_amount")
+                entry["payment_date"] = r_data.get("payment_date")
+                entry["settlement_date"] = r_data.get("settlement_date")
+            elif isinstance(r_data, list):
+                entry["duplicate_count"] = len(r_data)
+                
             batch_input.append(entry)
 
         ai_results_map = {}
@@ -231,14 +239,14 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
         if use_ai:
             import concurrent.futures
             
-            chunk_size = 20
+            chunk_size = 5
             chunks = [batch_input[i:i + chunk_size] for i in range(0, len(batch_input), chunk_size)]
             
             def process_chunk(chunk):
                 chunk_prompt = (
                     "Analyze EACH of the following reconciliation anomalies independently. "
-                    "Return a JSON array, one object per anomaly, in the SAME order.\n\n"
-                    f"ANOMALIES:\n{json.dumps(chunk, indent=2, default=str)}"
+                    "Return a JSON array of objects with keys: index, root_cause, confidence, explanation, suggested_resolution, needs_manual_review.\n\n"
+                    f"ANOMALIES:\n{json.dumps(chunk, default=str)}"
                 )
                 
                 results = {}
