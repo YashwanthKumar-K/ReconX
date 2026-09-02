@@ -767,18 +767,34 @@ if st.session_state.report is not None:
             )
 
         with exp_col2:
+            clean_anomalies = []
+            for a in report.get("anomalies", []):
+                clean_anomalies.append({
+                    "order_id":             a.get("order_id", ""),
+                    "anomaly_type":         a.get("anomaly_type", ""),
+                    "ai_classification":    a.get("ai_classification") or a.get("anomaly_type", ""),
+                    "ai_confidence":        a.get("ai_confidence", ""),
+                    "ai_explanation":       a.get("ai_explanation", ""),
+                    "ai_suggested_resolution": a.get("ai_suggested_resolution", ""),
+                    "needs_manual_review":  a.get("needs_manual_review", True),
+                    "detected_in_phase":    a.get("detected_in_phase", ""),
+                    "ai_provider":          a.get("ai_provider", ""),
+                })
+
             clean_report = {
-                "total_merchant_orders":      report.get("total_merchant_orders", 0),
-                "total_razorpay_transactions":report.get("total_razorpay_transactions", 0),
-                "total_bank_deposits":        report.get("total_bank_deposits", 0),
-                "total_matched":              report.get("total_matched", 0),
-                "total_anomalies":            report.get("total_anomalies", 0),
-                "match_rate":                 report.get("match_rate", 0),
-                "elapsed_seconds":            report.get("elapsed_seconds", 0),
-                "phase_stats":                report.get("phase_stats", []),
-                "scores":                     report.get("scores", {}),
-                "anomalies":                  report.get("anomalies", []),
-                "settlement_matches":         report.get("settlement_matches", []),
+                "total_merchant_orders":       report.get("total_merchant_orders", 0),
+                "total_razorpay_transactions": report.get("total_razorpay_transactions", 0),
+                "total_bank_deposits":         report.get("total_bank_deposits", 0),
+                "total_matched":               report.get("total_matched", 0),
+                "total_anomalies":             report.get("total_anomalies", 0),
+                "match_rate":                  report.get("match_rate", 0),
+                "elapsed_seconds":             report.get("elapsed_seconds", 0),
+                "phase_stats":                 report.get("phase_stats", []),
+                "scores": {
+                    k: v for k, v in report.get("scores", {}).items()
+                    if k != "ai_details"
+                },
+                "anomalies": clean_anomalies,
             }
             json_data = json.dumps(clean_report, indent=2, default=str)
             st.download_button(

@@ -124,12 +124,35 @@ def score_results(
 
         if is_settlement_level:
             rz_data = a.get("razorpay_data", {})
+            sub_order_ids = []
             if isinstance(rz_data, dict):
                 sub_order_ids = rz_data.get("order_ids", [])
+
+            if sub_order_ids:
                 for sub_oid in sub_order_ids:
                     if gt_dict.get(sub_oid) == "SPLIT_SETTLEMENT":
                         gt_type = "SPLIT_SETTLEMENT"
                         break
+            else:
+                gt_type = a.get("anomaly_type", "")
+                if gt_type == "NONE" or not gt_type:
+                    continue
+
+            ai_total += 1
+            normalized_ai = AI_TO_GROUND_TRUTH_MAP.get(ai_class, ai_class)
+            is_correct = (normalized_ai == gt_type) or (ai_class == gt_type)
+            if is_correct:
+                ai_correct += 1
+
+            ai_details.append({
+                "order_id": oid,
+                "ground_truth": gt_type,
+                "ai_classification": ai_class,
+                "normalized": normalized_ai,
+                "correct": is_correct,
+            })
+            continue
+
         else:
             if oid not in gt_dict:
                 continue
