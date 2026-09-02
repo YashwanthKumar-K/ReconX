@@ -112,10 +112,9 @@ def score_results(
             if isinstance(rz_data, dict):
                 sub_order_ids = rz_data.get("order_ids", [])
                 for sub_oid in sub_order_ids:
-                    if sub_oid in gt_dict:
-                        gt_type = gt_dict[sub_oid]
-                        if gt_type != "NONE":
-                            break
+                    if gt_dict.get(sub_oid) == "SPLIT_SETTLEMENT":
+                        gt_type = "SPLIT_SETTLEMENT"
+                        break
         else:
             if oid not in gt_dict:
                 continue
