@@ -50,9 +50,9 @@ def run_phase1(
                 "merchant_data": {
                     "amount": float(m_row["amount"]),
                     "order_date": str(m_row["order_date"]),
-                    "status": m_row["status"],
-                    "product": m_row["product"],
-                    "customer_name": m_row["customer_name"],
+                    "status": m_row.get("status", ""),
+                    "product": m_row.get("product", ""),
+                    "customer_name": m_row.get("customer_name", ""),
                 },
                 "razorpay_data": None,
                 "note": f"Order {order_id} exists in merchant records but not in Razorpay.",
@@ -71,9 +71,9 @@ def run_phase1(
                 "merchant_data": {
                     "amount": float(m_row["amount"]),
                     "order_date": str(m_row["order_date"]),
-                    "status": m_row["status"],
-                    "product": m_row["product"],
-                    "customer_name": m_row["customer_name"],
+                    "status": m_row.get("status", ""),
+                    "product": m_row.get("product", ""),
+                    "customer_name": m_row.get("customer_name", ""),
                 },
                 "razorpay_data": [
                     {
