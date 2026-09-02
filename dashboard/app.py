@@ -376,15 +376,11 @@ if st.session_state.report is not None:
         st.metric("Engine Accuracy", f"{engine_acc}%" if engine_acc is not None else "N/A",
                   help="Only available when ground_truth.csv is present")
     with c5:
-        if not report.get("use_ai", False):
-            st.metric("AI Accuracy", "Disabled", delta=None,
-                      help="AI Investigation (Phase 4) was disabled for this run")
-        else:
-            ai_acc = report["scores"].get("ai_accuracy")
-            ai_label = f"{ai_acc}%" if ai_acc is not None else "N/A"
-            ai_delta = f"{report['scores'].get('ai_correct', 0)}/{report['scores'].get('ai_total', 0)}" if ai_acc is not None else None
-            st.metric("AI Accuracy", ai_label, delta=ai_delta,
-                      help="Only available when ground_truth.csv is present and AI Investigation is enabled")
+        ai_acc = report["scores"]["ai_accuracy"]
+        ai_label = f"{ai_acc}%" if ai_acc is not None else "N/A"
+        ai_delta = f"{report['scores']['ai_correct']}/{report['scores']['ai_total']}" if ai_acc is not None else None
+        st.metric("AI Accuracy", ai_label, delta=ai_delta,
+                  help="Only available when ground_truth.csv is present")
 
     st.markdown("---")
 
@@ -653,36 +649,29 @@ if st.session_state.report is not None:
 
             with col_acc2:
                 st.markdown("#### AI Classification Accuracy")
-                if not report.get("use_ai", False):
-                    st.info(
-                        "**AI Investigation (Phase 4) was disabled for this run.**\n\n"
-                        "To evaluate LLM root-cause classification accuracy against the ground truth answer key, "
-                        "check **'Enable AI Investigation (Phase 4)'** and click Reconcile."
-                    )
-                else:
-                    fig_ai = go.Figure(go.Indicator(
-                        mode="gauge+number",
-                        value=scores.get("ai_accuracy", 0.0),
-                        title={"text": "AI Accuracy %"},
-                        gauge={
-                            "axis": {"range": [0, 100]},
-                            "bar": {"color": "#3b82f6"},
-                            "bgcolor": "#141a26",
-                            "steps": [
-                                {"range": [0, 60], "color": "rgba(239, 68, 68, 0.2)"},
-                                {"range": [60, 85], "color": "rgba(245, 158, 11, 0.2)"},
-                                {"range": [85, 100], "color": "rgba(59, 130, 246, 0.2)"},
-                            ],
-                        },
-                    ))
-                    fig_ai.update_layout(
-                        paper_bgcolor="rgba(0,0,0,0)",
-                        font=dict(color="white"),
-                        height=240,
-                        margin=dict(l=20, r=20, t=40, b=20),
-                    )
-                    st.plotly_chart(fig_ai, width='stretch')
-                    st.write(f"Correctly diagnosed: **{scores.get('ai_correct', 0)}/{scores.get('ai_total', 0)}** anomalies")
+                fig_ai = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=scores.get("ai_accuracy", 0.0),
+                    title={"text": "AI Accuracy %"},
+                    gauge={
+                        "axis": {"range": [0, 100]},
+                        "bar": {"color": "#3b82f6"},
+                        "bgcolor": "#141a26",
+                        "steps": [
+                            {"range": [0, 60], "color": "rgba(239, 68, 68, 0.2)"},
+                            {"range": [60, 85], "color": "rgba(245, 158, 11, 0.2)"},
+                            {"range": [85, 100], "color": "rgba(59, 130, 246, 0.2)"},
+                        ],
+                    },
+                ))
+                fig_ai.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="white"),
+                    height=240,
+                    margin=dict(l=20, r=20, t=40, b=20),
+                )
+                st.plotly_chart(fig_ai, width='stretch')
+                st.write(f"Correctly diagnosed: **{scores.get('ai_correct', 0)}/{scores.get('ai_total', 0)}** anomalies")
 
             if scores.get("ai_details"):
                 st.markdown("#### Ground Truth vs AI Predictions")
@@ -750,61 +739,63 @@ if st.session_state.report is not None:
 
         exp_col1, exp_col2 = st.columns(2)
 
-        try:
-            with exp_col1:
-                anomaly_rows = [{
-                    "order_id":             a.get("order_id", ""),
-                    "anomaly_type":         a.get("anomaly_type", ""),
-                    "ai_classification":    a.get("ai_classification", ""),
-                    "confidence":           a.get("ai_confidence", ""),
-                    "explanation":          a.get("ai_explanation", ""),
-                    "suggested_resolution": a.get("ai_suggested_resolution", ""),
-                    "needs_manual_review":  a.get("needs_manual_review", True),
-                    "detected_in_phase":    a.get("detected_in_phase", ""),
-                } for a in report.get("anomalies", [])]
+        # Build anomaly rows safely — works even if AI fields are missing or partial
+        anomaly_rows = []
+        for a in report.get("anomalies", []):
+            anomaly_rows.append({
+                "order_id":             a.get("order_id", ""),
+                "anomaly_type":         a.get("anomaly_type", ""),
+                "ai_classification":    a.get("ai_classification") or a.get("anomaly_type", "PENDING"),
+                "confidence":           a.get("ai_confidence", ""),
+                "explanation":          a.get("ai_explanation", "Awaiting AI analysis"),
+                "suggested_resolution": a.get("ai_suggested_resolution", ""),
+                "needs_manual_review":  a.get("needs_manual_review", True),
+                "detected_in_phase":    a.get("detected_in_phase", ""),
+            })
 
-                import io as _io
-                csv_buf = _io.StringIO()
-                pd.DataFrame(anomaly_rows).to_csv(csv_buf, index=False)
-                st.download_button(
-                    label="Download Exception Report (CSV)",
-                    data=csv_buf.getvalue(),
-                    file_name="reconx_anomaly_report.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                    help="All flagged anomalies with AI explanations and suggested resolutions",
-                )
+        with exp_col1:
+            import io as _io
+            csv_buf = _io.StringIO()
+            pd.DataFrame(anomaly_rows).to_csv(csv_buf, index=False)
+            st.download_button(
+                label="Download Exception Report (CSV)",
+                data=csv_buf.getvalue(),
+                file_name="reconx_anomaly_report.csv",
+                mime="text/csv",
+                use_container_width=True,
+                help="All flagged anomalies with AI explanations and suggested resolutions",
+            )
 
-            with exp_col2:
-                clean_report = {
-                    "total_merchant_orders": report.get("total_merchant_orders", 0),
-                    "total_razorpay_transactions": report.get("total_razorpay_transactions", 0),
-                    "total_bank_deposits": report.get("total_bank_deposits", 0),
-                    "total_matched": report.get("total_matched", 0),
-                    "total_anomalies": report.get("total_anomalies", 0),
-                    "match_rate": report.get("match_rate", 0),
-                    "elapsed_seconds": report.get("elapsed_seconds", 0),
-                    "phase_stats": report.get("phase_stats", []),
-                    "scores": report.get("scores", {}),
-                    "anomalies": report.get("anomalies", []),
-                    "settlement_matches": report.get("settlement_matches", []),
-                }
-                json_data = json.dumps(clean_report, indent=2, default=str)
-                st.download_button(
-                    label="Download Full Audit Summary (JSON)",
-                    data=json_data,
-                    file_name="reconx_full_report.json",
-                    mime="application/json",
-                    use_container_width=True,
-                    help="Complete reconciliation report with phase stats, scores, and all anomaly records",
-                )
+        with exp_col2:
+            clean_report = {
+                "total_merchant_orders":      report.get("total_merchant_orders", 0),
+                "total_razorpay_transactions":report.get("total_razorpay_transactions", 0),
+                "total_bank_deposits":        report.get("total_bank_deposits", 0),
+                "total_matched":              report.get("total_matched", 0),
+                "total_anomalies":            report.get("total_anomalies", 0),
+                "match_rate":                 report.get("match_rate", 0),
+                "elapsed_seconds":            report.get("elapsed_seconds", 0),
+                "phase_stats":                report.get("phase_stats", []),
+                "scores":                     report.get("scores", {}),
+                "anomalies":                  report.get("anomalies", []),
+                "settlement_matches":         report.get("settlement_matches", []),
+            }
+            json_data = json.dumps(clean_report, indent=2, default=str)
+            st.download_button(
+                label="Download Full Audit Summary (JSON)",
+                data=json_data,
+                file_name="reconx_full_report.json",
+                mime="application/json",
+                use_container_width=True,
+                help="Complete reconciliation report with phase stats, scores, and all anomaly records",
+            )
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("#### Anomaly Data Export Preview")
-            if report.get("anomalies"):
-                st.dataframe(pd.DataFrame(anomaly_rows), width='stretch', height=300)
-        except Exception as e:
-            st.error(f"Error generating export files: {e}")
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### Anomaly Data Export Preview")
+        if anomaly_rows:
+            st.dataframe(pd.DataFrame(anomaly_rows), width='stretch', height=300)
+        else:
+            st.info("No anomalies to export.")
 
     # ─── Performance Footer ───────────────────────────────────────────
     st.markdown("---")

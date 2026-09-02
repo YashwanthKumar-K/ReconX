@@ -254,7 +254,7 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
         if use_ai:
             import concurrent.futures
             
-            chunk_size = 5
+            chunk_size = 15
             chunks = [batch_input[i:i + chunk_size] for i in range(0, len(batch_input), chunk_size)]
             
             def process_chunk(chunk):
@@ -291,10 +291,15 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
                         logger.warning(f"{provider_name} parse failed: {e}")
                         return False
 
-                # 1. Groq
-                raw_groq = _call_groq(chunk_prompt)
-                if raw_groq and parse_and_map(raw_groq, "Groq (GPT-OSS 120B)"):
-                    return results, providers
+                import time as _time
+
+                # 1. Groq — retry up to 3 times with backoff
+                for attempt in range(3):
+                    raw_groq = _call_groq(chunk_prompt)
+                    if raw_groq and parse_and_map(raw_groq, "Groq (GPT-OSS 120B)"):
+                        return results, providers
+                    if attempt < 2:
+                        _time.sleep(1.0 + (1.5 ** attempt))
                     
                 # 2. NVIDIA NIM
                 if len(results) < len(chunk):
@@ -324,7 +329,7 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
 
             completed_chunks = 0
             num_keys = max(1, len([k for k in _get_secret("GROQ_API_KEY").split(",") if k.strip()]))
-            max_workers = min(len(chunks), max(5, num_keys * 3))
+            max_workers = min(len(chunks), max(3, num_keys * 2))
 
             # Run chunks in parallel across all keys
             with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
