@@ -32,14 +32,15 @@ st.set_page_config(
 st.markdown("""
 <style>
     .stApp {
-        background-color: #0f1117;
+        background-color: #0b0e14;
     }
     .metric-card {
-        background: linear-gradient(135deg, #1a1f2e 0%, #252b3b 100%);
-        border: 1px solid #2d3548;
+        background: linear-gradient(135deg, #131824 0%, #1c2333 100%);
+        border: 1px solid #263248;
         border-radius: 12px;
         padding: 20px;
         text-align: center;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
     }
     .metric-value {
         font-size: 2.5rem;
@@ -52,8 +53,8 @@ st.markdown("""
         margin-top: 4px;
     }
     .anomaly-card {
-        background: #1a1f2e;
-        border: 1px solid #2d3548;
+        background: #131824;
+        border: 1px solid #263248;
         border-radius: 10px;
         padding: 16px;
         margin-bottom: 12px;
@@ -65,22 +66,52 @@ st.markdown("""
         font-size: 0.75rem;
         font-weight: 600;
     }
-    .badge-high { background: #ff4b4b33; color: #ff4b4b; border: 1px solid #ff4b4b55; }
-    .badge-medium { background: #ffa50033; color: #ffa500; border: 1px solid #ffa50055; }
-    .badge-low { background: #4caf5033; color: #4caf50; border: 1px solid #4caf5055; }
+    .badge-high { background: #ff4b4b33; color: #ff6b6b; border: 1px solid #ff4b4b55; }
+    .badge-medium { background: #ffa50033; color: #ffb833; border: 1px solid #ffa50055; }
+    .badge-low { background: #4caf5033; color: #5cd662; border: 1px solid #4caf5055; }
     .matched-row { background: #1b3a2a; }
     div[data-testid="stMetric"] {
-        background: linear-gradient(135deg, #1a1f2e 0%, #252b3b 100%);
-        border: 1px solid #2d3548;
+        background: linear-gradient(135deg, #131824 0%, #1c2333 100%);
+        border: 1px solid #263248;
         border-radius: 12px;
         padding: 16px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
     .title-gradient {
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        font-size: 2.2rem;
+        font-size: 2.5rem;
         font-weight: 800;
+        letter-spacing: -0.5px;
+    }
+    .hero-tagline {
+        color: #94a3b8;
+        font-size: 1.05rem;
+        margin-top: -6px;
+        margin-bottom: 12px;
+    }
+    .arch-card {
+        background: #131824;
+        border: 1px solid #263248;
+        border-radius: 10px;
+        padding: 16px;
+        height: 100%;
+        transition: transform 0.2s, border-color 0.2s;
+    }
+    .arch-card:hover {
+        border-color: #3b82f6;
+    }
+    .track-badge {
+        background: rgba(59, 130, 246, 0.15);
+        color: #60a5fa;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: inline-block;
+        margin-bottom: 8px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -88,20 +119,32 @@ st.markdown("""
 
 # ─── Header ──────────────────────────────────────────────────────────────────
 
+st.markdown('<div class="track-badge">🏆 Razorpay AI Buildathon — Track 04: AI Finance Controller</div>', unsafe_allow_html=True)
 st.markdown('<h1 class="title-gradient">ReconX</h1>', unsafe_allow_html=True)
-st.markdown("**Multi-Way Ledger Reconciliation Engine** — Algorithms for 95%, AI for the rest.")
+st.markdown('<p class="hero-tagline"><b>Autonomous Multi-Way Ledger Reconciliation Engine</b> — Deterministic math for 95%, parallel AI agents for the rest.</p>', unsafe_allow_html=True)
 st.markdown("---")
 
 # ─── Sidebar Settings ────────────────────────────────────────────────────────
 with st.sidebar:
-    st.header("⚙️ Configuration")
-    st.markdown("Tweak matching parameters below:")
+    st.header("⚙️ Engine Configuration")
+    st.markdown("Dynamic matching parameters:")
     from engine.config import config
     config.expected_fee_rate = st.number_input("Razorpay Fee Rate (%)", value=config.expected_fee_rate * 100, step=0.1) / 100.0
     config.fee_rate_tolerance = st.number_input("Fee Tolerance (%)", value=config.fee_rate_tolerance * 100, step=0.1) / 100.0
     config.amount_tolerance = st.number_input("Amount Tolerance (₹)", value=config.amount_tolerance, step=0.01)
+    
     st.markdown("---")
-    st.markdown("*These parameters adjust the strictness of Phase 1 (Deterministic Matcher).*")
+    st.markdown("### 🤖 Active AI Waterfall")
+    st.markdown(
+        """
+        - 🟢 **Groq (Llama 3 70B)** — Primary
+        - 🟢 **NVIDIA NIM (Llama 3.1 70B)** — Fallback 1
+        - 🟢 **Gemini 1.5 Flash** — Fallback 2
+        - 🛡️ **Rule-Based Engine** — Offline Safety
+        """
+    )
+    st.markdown("---")
+    st.caption("ReconX isolates math from LLMs. AI exclusively handles semantic root-cause diagnosis.")
 
 
 # ─── Session State ────────────────────────────────────────────────────────────
@@ -701,13 +744,81 @@ if st.session_state.report is not None:
 
 # ─── Footer ──────────────────────────────────────────────────────────────────
 
+# ─── Landing Page / Architecture Overview ────────────────────────────────────
+
 if st.session_state.report is None:
     st.markdown("---")
+    st.markdown("### 🧩 Three-Way Ledger Architecture")
     st.markdown(
-        "### How it works\n\n"
-        "1. **Phase 1** — Direct key matching: HashMap lookup by `order_id` (~85-90% matched)\n"
-        "2. **Phase 2** — Settlement batch matching: Group & sum Razorpay txns, match to bank deposits\n"
-        "3. **Phase 3** — Bounded subset-sum: Find combinations of settlements that match deposits\n"
-        "4. **Phase 4** — AI investigation: Gemini analyzes remaining anomalies and explains why\n\n"
-        "**The key insight:** Algorithms handle what's computable. AI handles what's ambiguous."
+        "ReconX autonomously bridges the disconnect between three distinct financial systems:"
     )
+
+    col_l1, col_l2, col_l3 = st.columns(3)
+    with col_l1:
+        st.markdown("""
+        <div class="arch-card">
+            <h4>📦 1. Merchant DB</h4>
+            <p style="color:#94a3b8; font-size:0.9rem;">Order-level records from your store backend.</p>
+            <hr style="border-color:#263248; margin:8px 0;">
+            <p style="font-size:0.85rem;"><code>order_id</code>, <code>amount</code>, <code>status</code></p>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_l2:
+        st.markdown("""
+        <div class="arch-card">
+            <h4>⚡ 2. Razorpay Gateway</h4>
+            <p style="color:#94a3b8; font-size:0.9rem;">Transaction fees, GST tax, and settlement batches.</p>
+            <hr style="border-color:#263248; margin:8px 0;">
+            <p style="font-size:0.85rem;"><code>payment_id</code>, <code>fee</code>, <code>tax</code>, <code>net_amount</code></p>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_l3:
+        st.markdown("""
+        <div class="arch-card">
+            <h4>🏦 3. Bank Statement</h4>
+            <p style="color:#94a3b8; font-size:0.9rem;">Aggregated deposits credited to the merchant account.</p>
+            <hr style="border-color:#263248; margin:8px 0;">
+            <p style="font-size:0.85rem;"><code>utr_number</code>, <code>deposit_amount</code>, <code>deposit_date</code></p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("### 🚀 4-Phase Reconciliation Pipeline")
+
+    p_c1, p_c2, p_c3, p_c4 = st.columns(4)
+    with p_c1:
+        st.markdown("""
+        <div class="arch-card">
+            <span class="phase-badge badge-low">PHASE 1</span>
+            <h5 style="margin-top:8px;">Direct Key Match</h5>
+            <p style="color:#94a3b8; font-size:0.85rem;">Deterministic O(1) hash table lookup by <code>order_id</code>. Solves ~90% of volume and flags fee/tax math discrepancies instantly.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with p_c2:
+        st.markdown("""
+        <div class="arch-card">
+            <span class="phase-badge badge-low">PHASE 2</span>
+            <h5 style="margin-top:8px;">Settlement Match</h5>
+            <p style="color:#94a3b8; font-size:0.85rem;">Groups Razorpay transactions by <code>settlement_id</code>, aggregates net batch amounts, and regex-matches against bank deposits.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with p_c3:
+        st.markdown("""
+        <div class="arch-card">
+            <span class="phase-badge badge-medium">PHASE 3</span>
+            <h5 style="margin-top:8px;">Subset-Sum Graph</h5>
+            <p style="color:#94a3b8; font-size:0.85rem;">Solves multi-deposit split settlements with bounded combinatorial pruning to guarantee real-time execution without NP-hard hangs.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with p_c4:
+        st.markdown("""
+        <div class="arch-card">
+            <span class="phase-badge badge-high">PHASE 4</span>
+            <h5 style="margin-top:8px;">Parallel AI Agents</h5>
+            <p style="color:#94a3b8; font-size:0.85rem;">Remaining edge cases (~5%) are chunked and investigated across a parallel swarm of Groq, NVIDIA NIM, and Gemini models.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.info("💡 **Ready to test?** Click **'📂 Load Sample Data (50 orders)'** or **'📊 Generate 500 Orders'** above, then click **RECONCILE** to see the pipeline in action!")
+
