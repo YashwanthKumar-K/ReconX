@@ -119,14 +119,14 @@ col_load1, col_load2, col_load3 = st.columns([2, 2, 2])
 with col_load1:
     sample_btn = st.button(
         "📂 Load Sample Data (50 orders)",
-        width='stretch',
+        use_container_width=True,
         type="primary",
     )
 
 with col_load2:
     sample_500_btn = st.button(
         "📊 Generate 500 Orders",
-        width='stretch',
+        use_container_width=True,
     )
 
 with col_load3:
@@ -220,7 +220,7 @@ if data_dir or "data_dir" in st.session_state:
             help="Load pre-computed AI results instantly. Run once with Live AI to build the cache."
         )
     with col_r3:
-        reconcile_btn = st.button("RECONCILE", type="primary", width='stretch')
+        reconcile_btn = st.button("RECONCILE", type="primary", use_container_width=True)
 
     if reconcile_btn:
         st.session_state.running = True
@@ -683,7 +683,7 @@ if st.session_state.report is not None:
                 data=csv_buf.getvalue(),
                 file_name="reconx_anomaly_report.csv",
                 mime="text/csv",
-                width='stretch',
+                use_container_width=True,
                 help="All flagged anomalies with AI explanations and suggested resolutions",
             )
 
@@ -694,7 +694,7 @@ if st.session_state.report is not None:
                 data=json.dumps(report, indent=2, default=str),
                 file_name="reconx_full_report.json",
                 mime="application/json",
-                width='stretch',
+                use_container_width=True,
                 help="Complete reconciliation report with all phase stats, matched results, and scores",
             )
 
