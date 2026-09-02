@@ -808,9 +808,7 @@ if st.session_state.report is not None:
 
 # ─── Footer ──────────────────────────────────────────────────────────────────
 
-# ─── Landing Page / Architecture Overview ────────────────────────────────────
-
-if st.session_state.report is None:
+else:
     st.markdown("### Ledger Data Sources")
     st.markdown(
         "<p style='color:#94a3b8; font-size:0.9rem; margin-top:-8px;'>ReconX validates and reconciles records across three distinct transaction ledgers:</p>",

@@ -68,10 +68,16 @@ def score_results(
     anomaly_order_ids = set()
     for a in anomalies:
         oid = a.get("order_id", "")
+        is_settlement_level = (
+            oid.startswith("SETTLEMENT_") or
+            oid.startswith("BANK_") or
+            oid.lower().startswith("setl") or
+            oid.startswith("UTR_") or
+            a.get("anomaly_type") in ("SPLIT_SETTLEMENT", "SETTLEMENT_MISMATCH", "ORPHAN_DEPOSIT")
+        )
 
-        if oid.startswith("SETTLEMENT_") or oid.startswith("BANK_"):
+        if is_settlement_level:
             # Extract individual order_ids from settlement-level anomalies
-            # Only count orders that actually have an injected anomaly
             rz_data = a.get("razorpay_data", {})
             if isinstance(rz_data, dict):
                 sub_order_ids = rz_data.get("order_ids", [])
@@ -95,20 +101,28 @@ def score_results(
     engine_accuracy = round(engine_correct / engine_total * 100, 1) if engine_total > 0 else 0.0
 
     # ─── AI Classification Accuracy ───────────────────────────────────────
-    # For anomalies where AI was invoked, did it get the type right?
+    # For anomalies where AI was invoked (or fallback classified), did it get the type right?
     ai_correct = 0
     ai_total = 0
     ai_details = []
 
     for a in anomalies:
         oid = a.get("order_id", "")
-        ai_class = a.get("ai_classification")
+        ai_class = a.get("ai_classification") or a.get("anomaly_type")
         if not ai_class:
             continue
             
         # For split settlements, verify against any of its underlying orders
         gt_type = "NONE"
-        if oid.startswith("SETTLEMENT_") or oid.startswith("BANK_"):
+        is_settlement_level = (
+            oid.startswith("SETTLEMENT_") or
+            oid.startswith("BANK_") or
+            oid.lower().startswith("setl") or
+            oid.startswith("UTR_") or
+            a.get("anomaly_type") in ("SPLIT_SETTLEMENT", "SETTLEMENT_MISMATCH", "ORPHAN_DEPOSIT")
+        )
+
+        if is_settlement_level:
             rz_data = a.get("razorpay_data", {})
             if isinstance(rz_data, dict):
                 sub_order_ids = rz_data.get("order_ids", [])
