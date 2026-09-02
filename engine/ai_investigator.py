@@ -93,10 +93,16 @@ IMPORTANT:
 """
 
 
-# ─── Groq Helper ─────────────────────────────────────────────────────────────
+# ─── Groq Helper with Round-Robin Multi-Key Load Balancing ─────────────────
+
+import threading
+_groq_key_idx = 0
+_groq_lock = threading.Lock()
+
 
 def _call_groq(prompt: str) -> Optional[str]:
-    """Call Groq API using urllib (no extra dependencies). Returns raw text or None."""
+    """Call Groq API using urllib with round-robin key rotation across threads."""
+    global _groq_key_idx
     groq_keys_raw = _get_secret("GROQ_API_KEY")
     if not groq_keys_raw:
         return None
@@ -104,10 +110,19 @@ def _call_groq(prompt: str) -> Optional[str]:
     import urllib.request
     import urllib.error
 
-    groq_keys = [k.strip() for k in groq_keys_raw.split(",") if k.strip()]
+    all_keys = [k.strip() for k in groq_keys_raw.split(",") if k.strip()]
+    if not all_keys:
+        return None
+
+    with _groq_lock:
+        start_idx = _groq_key_idx % len(all_keys)
+        _groq_key_idx += 1
+
+    # Rotate keys so each thread starts on its own assigned key
+    ordered_keys = all_keys[start_idx:] + all_keys[:start_idx]
     models_to_try = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "groq/compound-mini"]
 
-    for key in groq_keys:
+    for key in ordered_keys:
         for model_name in models_to_try:
             try:
                 url = "https://api.groq.com/openai/v1/chat/completions"
@@ -308,8 +323,11 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
                 return results, providers
 
             completed_chunks = 0
-            # Run chunks in parallel
-            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            num_keys = max(1, len([k for k in _get_secret("GROQ_API_KEY").split(",") if k.strip()]))
+            max_workers = min(len(chunks), max(5, num_keys * 3))
+
+            # Run chunks in parallel across all keys
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
                 future_to_chunk = {executor.submit(process_chunk, chunk): chunk for chunk in chunks}
                 for future in concurrent.futures.as_completed(future_to_chunk):
                     chunk_res, chunk_prov = future.result()
