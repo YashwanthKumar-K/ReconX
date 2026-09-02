@@ -105,33 +105,37 @@ def _call_groq(prompt: str) -> Optional[str]:
     import urllib.error
 
     groq_keys = [k.strip() for k in groq_keys_raw.split(",") if k.strip()]
+    models_to_try = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "groq/compound-mini"]
+
     for key in groq_keys:
-        try:
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {key}",
-                "Content-Type": "application/json",
-            }
-            payload = {
-                "model": "llama3-70b-8192",
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                "response_format": {"type": "json_object"},
-                "temperature": 0.1,
-            }
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode("utf-8"),
-                headers=headers,
-            )
-            with urllib.request.urlopen(req, timeout=6) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                return data["choices"][0]["message"]["content"]
-        except Exception as e:
-            logger.warning(f"Groq call failed (key ending ...{key[-6:]}): {e}")
-            continue
+        for model_name in models_to_try:
+            try:
+                url = "https://api.groq.com/openai/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "ReconX/1.0",
+                }
+                payload = {
+                    "model": model_name,
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "response_format": {"type": "json_object"},
+                    "temperature": 0.1,
+                }
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers=headers,
+                )
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    return data["choices"][0]["message"]["content"]
+            except Exception as e:
+                logger.warning(f"Groq call failed ({model_name}, key ...{key[-4:]}): {e}")
+                continue
     return None
 
 
@@ -266,7 +270,7 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
 
                 # 1. Groq
                 raw_groq = _call_groq(chunk_prompt)
-                if raw_groq and parse_and_map(raw_groq, "Groq (Llama 3 70B)"):
+                if raw_groq and parse_and_map(raw_groq, "Groq (GPT-OSS 120B)"):
                     return results, providers
                     
                 # 2. NVIDIA NIM
@@ -281,7 +285,7 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
                     if client:
                         try:
                             response = client.models.generate_content(
-                                model="gemini-3.5-flash",
+                                model="gemini-3.6-flash",
                                 contents=chunk_prompt,
                                 config={
                                     "system_instruction": SYSTEM_PROMPT,
@@ -289,7 +293,7 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
                                     "http_options": {"timeout": 10},
                                 },
                             )
-                            parse_and_map(response.text, "Gemini (gemini-3.5-flash)")
+                            parse_and_map(response.text, "Gemini (3.6 Flash)")
                         except Exception as e:
                             logger.warning(f"Gemini chunk call failed: {e}")
                             
