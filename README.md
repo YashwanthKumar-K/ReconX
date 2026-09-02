@@ -167,47 +167,80 @@ ReconX/
 ├── data/
 │   ├── demo_100/                   # Quick demo dataset (100 orders)
 │   ├── sample/                     # Standard sample dataset (500 orders)
-│   └── generated_8000/             # Enterprise benchmark dataset (8,000 orders)
-├── .env.example                    # Template for API credentials
+├── run.bat                         # Windows 1-Click launcher (automated setup)
+├── run.sh                          # macOS / Linux 1-Click launcher (automated setup)
+├── Dockerfile                      # Containerization recipe
+├── docker-compose.yml              # Single-command container deployment
+├── pyproject.toml                  # Modern Python package specification
 ├── requirements.txt                # Production dependencies
 └── README.md                       # Documentation & architecture specifications
 ```
 
 ---
 
-## 🚀 Quick Start & Installation
+## 🚀 Easy Installation & Running Across Any Device
 
-### 1. Clone the Repository
+Choose whichever method best matches your setup:
+
+### Method A: One-Click Launchers (Zero Manual Setup)
+
+#### 🪟 On Windows:
+Simply double-click **`run.bat`** (or execute in PowerShell/CMD):
+```cmd
+run.bat
+```
+*Automatically detects Python, creates `.venv`, installs dependencies, and launches the browser.*
+
+#### 🍏 On macOS / 🐧 Linux:
+Make executable and run:
 ```bash
+chmod +x run.sh
+./run.sh
+```
+
+---
+
+### Method B: Docker (Containerized with Zero Prerequisites)
+If you have Docker installed, you don't even need Python on your host machine:
+
+```bash
+# Build and run with a single command:
+docker compose up --build
+```
+Access the application immediately at **`http://localhost:8501`**.
+
+---
+
+### Method C: Standard Python Virtual Environment
+
+```bash
+# 1. Clone the repository
 git clone https://github.com/YashwanthKumar-K/ReconX.git
 cd ReconX
-```
 
-### 2. Set Up Virtual Environment & Dependencies
-```bash
+# 2. Create and activate virtual environment
 python -m venv venv
-# On Windows:
-.\venv\Scripts\activate
-# On Linux/macOS:
-source venv/bin/activate
+# Windows: .\venv\Scripts\activate
+# macOS/Linux: source venv/bin/activate
 
+# 3. Install dependencies
 pip install -r requirements.txt
-```
 
-### 3. Configure API Credentials
-Create a `.env` file in the project root (or configure `.streamlit/secrets.toml`):
-```env
-# Multi-key pool: Separate keys with commas to enable parallel round-robin load balancing
-GROQ_API_KEY="gsk_key1,gsk_key2,gsk_key3"
-NVIDIA_API_KEY="nvapi-key1,nvapi-key2"
-GEMINI_API_KEY="AIza_key1,AIza_key2"
-```
-
-### 4. Launch the Dashboard
-```bash
+# 4. Launch Dashboard
 streamlit run dashboard/app.py
 ```
-Open **`http://localhost:8501`** in your browser to run reconciliations across preloaded datasets or upload custom CSVs.
+
+---
+
+### Method D: Install as a Python CLI Tool
+You can install ReconX directly as a system command:
+```bash
+pip install .
+
+# Run reconciliation on any folder directly from your terminal:
+reconx data/sample
+reconx data/generated_8000 --no-ai
+```
 
 ---
 

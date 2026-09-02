@@ -232,6 +232,8 @@ def run_reconciliation(
         "anomalies": enriched_anomalies,
         "scores": scores,
         "elapsed_seconds": elapsed,
+        "author": "K Yashwanth Kumar",
+        "track": "Razorpay Buildathon Track 04",
     }
 
     if verbose:
@@ -248,11 +250,11 @@ def run_reconciliation(
 
 # ─── CLI Entry Point ─────────────────────────────────────────────────────────
 
-if __name__ == "__main__":
+def main():
     import sys
     import json
 
-    data_dir = sys.argv[1] if len(sys.argv) > 1 else "data/sample"
+    data_dir = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else "data/sample"
     use_ai = "--no-ai" not in sys.argv
 
     report = run_reconciliation(data_dir=data_dir, use_ai=use_ai)
@@ -264,12 +266,16 @@ if __name__ == "__main__":
         oid = a.get('order_id', '?')
         atype = a.get('ai_classification', a.get('anomaly_type', '?'))
         explanation = a.get('ai_explanation', a.get('note', ''))
-        # Sanitize for Windows console
-        explanation = explanation.encode('ascii', 'replace').decode('ascii')
+        # Sanitize for console
+        explanation = str(explanation).encode('ascii', 'replace').decode('ascii')
         print(f"\n  [{conf}] {oid}")
         print(f"  Type: {atype}")
         print(f"  {explanation}")
         if a.get("ai_suggested_resolution"):
-            res = a['ai_suggested_resolution'].encode('ascii', 'replace').decode('ascii')
+            res = str(a['ai_suggested_resolution']).encode('ascii', 'replace').decode('ascii')
             print(f"  Resolution: {res}")
+
+
+if __name__ == "__main__":
+    main()
 

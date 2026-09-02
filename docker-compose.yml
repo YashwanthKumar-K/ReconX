@@ -1,0 +1,15 @@
+﻿version: '3.8'
+
+services:
+  reconx:
+    build: .
+    container_name: reconx-engine
+    ports:
+      - "8501:8501"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
