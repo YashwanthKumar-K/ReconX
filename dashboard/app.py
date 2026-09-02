@@ -32,86 +32,89 @@ st.set_page_config(
 st.markdown("""
 <style>
     .stApp {
-        background-color: #0b0e14;
+        background-color: #0c0f17;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     .metric-card {
-        background: linear-gradient(135deg, #131824 0%, #1c2333 100%);
-        border: 1px solid #263248;
-        border-radius: 12px;
-        padding: 20px;
-        text-align: center;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+        background: #141a26;
+        border: 1px solid #1f293d;
+        border-radius: 8px;
+        padding: 18px;
     }
     .metric-value {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #ffffff;
+        font-size: 2.2rem;
+        font-weight: 600;
+        color: #f8fafc;
+        letter-spacing: -0.5px;
     }
     .metric-label {
-        font-size: 0.9rem;
-        color: #8899aa;
+        font-size: 0.85rem;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
         margin-top: 4px;
     }
-    .anomaly-card {
-        background: #131824;
-        border: 1px solid #263248;
-        border-radius: 10px;
-        padding: 16px;
-        margin-bottom: 12px;
+    div[data-testid="stMetric"] {
+        background: #141a26;
+        border: 1px solid #1f293d;
+        border-radius: 8px;
+        padding: 14px 18px;
     }
     .phase-badge {
         display: inline-block;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.72rem;
         font-weight: 600;
+        letter-spacing: 0.3px;
+        text-transform: uppercase;
     }
-    .badge-high { background: #ff4b4b33; color: #ff6b6b; border: 1px solid #ff4b4b55; }
-    .badge-medium { background: #ffa50033; color: #ffb833; border: 1px solid #ffa50055; }
-    .badge-low { background: #4caf5033; color: #5cd662; border: 1px solid #4caf5055; }
-    .matched-row { background: #1b3a2a; }
-    div[data-testid="stMetric"] {
-        background: linear-gradient(135deg, #131824 0%, #1c2333 100%);
-        border: 1px solid #263248;
-        border-radius: 12px;
-        padding: 16px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    .badge-high { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-medium { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-low { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+    
+    .enterprise-header {
+        padding: 6px 0 16px 0;
+        border-bottom: 1px solid #1e293b;
+        margin-bottom: 20px;
     }
-    .title-gradient {
-        background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-size: 2.5rem;
-        font-weight: 800;
+    .brand-title {
+        font-size: 1.85rem;
+        font-weight: 700;
+        color: #ffffff;
+        margin: 0;
         letter-spacing: -0.5px;
     }
-    .hero-tagline {
+    .brand-subtitle {
         color: #94a3b8;
-        font-size: 1.05rem;
-        margin-top: -6px;
-        margin-bottom: 12px;
+        font-size: 0.95rem;
+        margin: 4px 0 0 0;
     }
-    .arch-card {
-        background: #131824;
-        border: 1px solid #263248;
-        border-radius: 10px;
-        padding: 16px;
+    .spec-card {
+        background: #111622;
+        border: 1px solid #1e293b;
+        border-radius: 8px;
+        padding: 16px 18px;
         height: 100%;
-        transition: transform 0.2s, border-color 0.2s;
     }
-    .arch-card:hover {
-        border-color: #3b82f6;
-    }
-    .track-badge {
-        background: rgba(59, 130, 246, 0.15);
-        color: #60a5fa;
-        border: 1px solid rgba(59, 130, 246, 0.3);
-        padding: 3px 10px;
-        border-radius: 12px;
-        font-size: 0.8rem;
+    .spec-title {
+        font-size: 0.92rem;
         font-weight: 600;
-        display: inline-block;
-        margin-bottom: 8px;
+        color: #e2e8f0;
+        margin-bottom: 6px;
+    }
+    .spec-desc {
+        font-size: 0.83rem;
+        color: #94a3b8;
+        line-height: 1.45;
+        margin: 0;
+    }
+    .spec-meta {
+        font-size: 0.78rem;
+        color: #64748b;
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px solid #1e293b;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -119,32 +122,42 @@ st.markdown("""
 
 # ─── Header ──────────────────────────────────────────────────────────────────
 
-st.markdown('<div class="track-badge">🏆 Razorpay AI Buildathon — Track 04: AI Finance Controller</div>', unsafe_allow_html=True)
-st.markdown('<h1 class="title-gradient">ReconX</h1>', unsafe_allow_html=True)
-st.markdown('<p class="hero-tagline"><b>Autonomous Multi-Way Ledger Reconciliation Engine</b> — Deterministic math for 95%, parallel AI agents for the rest.</p>', unsafe_allow_html=True)
-st.markdown("---")
+st.markdown("""
+<div class="enterprise-header">
+    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <div>
+            <h1 class="brand-title">ReconX</h1>
+            <p class="brand-subtitle">Automated Multi-Way Ledger Reconciliation & AI Anomaly Resolution Engine</p>
+        </div>
+        <div style="text-align: right;">
+            <span style="font-size: 0.78rem; color: #94a3b8; background: #141a26; padding: 4px 10px; border-radius: 4px; border: 1px solid #1f293d;">
+                Razorpay Buildathon · Track 04
+            </span>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ─── Sidebar Settings ────────────────────────────────────────────────────────
 with st.sidebar:
-    st.header("⚙️ Engine Configuration")
-    st.markdown("Dynamic matching parameters:")
+    st.markdown("### Matching Parameters")
     from engine.config import config
     config.expected_fee_rate = st.number_input("Razorpay Fee Rate (%)", value=config.expected_fee_rate * 100, step=0.1) / 100.0
-    config.fee_rate_tolerance = st.number_input("Fee Tolerance (%)", value=config.fee_rate_tolerance * 100, step=0.1) / 100.0
+    config.fee_rate_tolerance = st.number_input("Fee Rate Tolerance (%)", value=config.fee_rate_tolerance * 100, step=0.1) / 100.0
     config.amount_tolerance = st.number_input("Amount Tolerance (₹)", value=config.amount_tolerance, step=0.01)
     
     st.markdown("---")
-    st.markdown("### 🤖 Active AI Waterfall")
+    st.markdown("### AI Inference Stack")
     st.markdown(
         """
-        - 🟢 **Groq (Llama 3 70B)** — Primary
-        - 🟢 **NVIDIA NIM (Llama 3.1 70B)** — Fallback 1
-        - 🟢 **Gemini 1.5 Flash** — Fallback 2
-        - 🛡️ **Rule-Based Engine** — Offline Safety
+        - **Primary:** Groq (Llama 3 70B)
+        - **Secondary:** NVIDIA NIM (Llama 3.1 70B)
+        - **Tertiary:** Google Gemini 1.5 Flash
+        - **Fallback:** Deterministic Classifier
         """
     )
     st.markdown("---")
-    st.caption("ReconX isolates math from LLMs. AI exclusively handles semantic root-cause diagnosis.")
+    st.caption("Engine architecture: Pure deterministic matching for computable arithmetic; LLM agents for contextual exception analysis.")
 
 
 # ─── Session State ────────────────────────────────────────────────────────────
@@ -161,14 +174,14 @@ col_load1, col_load2, col_load3 = st.columns([2, 2, 2])
 
 with col_load1:
     sample_btn = st.button(
-        "📂 Load Sample Data (50 orders)",
+        "Load Sample Data (50 orders)",
         use_container_width=True,
         type="primary",
     )
 
 with col_load2:
     sample_500_btn = st.button(
-        "📊 Generate 500 Orders",
+        "Generate 500 Orders",
         use_container_width=True,
     )
 
@@ -747,78 +760,76 @@ if st.session_state.report is not None:
 # ─── Landing Page / Architecture Overview ────────────────────────────────────
 
 if st.session_state.report is None:
-    st.markdown("---")
-    st.markdown("### 🧩 Three-Way Ledger Architecture")
+    st.markdown("### Ledger Data Sources")
     st.markdown(
-        "ReconX autonomously bridges the disconnect between three distinct financial systems:"
+        "<p style='color:#94a3b8; font-size:0.9rem; margin-top:-8px;'>ReconX validates and reconciles records across three distinct transaction ledgers:</p>",
+        unsafe_allow_html=True
     )
 
     col_l1, col_l2, col_l3 = st.columns(3)
     with col_l1:
         st.markdown("""
-        <div class="arch-card">
-            <h4>📦 1. Merchant DB</h4>
-            <p style="color:#94a3b8; font-size:0.9rem;">Order-level records from your store backend.</p>
-            <hr style="border-color:#263248; margin:8px 0;">
-            <p style="font-size:0.85rem;"><code>order_id</code>, <code>amount</code>, <code>status</code></p>
+        <div class="spec-card">
+            <div class="spec-title">1. Merchant Order Records</div>
+            <p class="spec-desc">Order-level transactions exported from the merchant e-commerce platform or ERP backend.</p>
+            <div class="spec-meta">Primary Schema: <code>order_id</code>, <code>amount</code>, <code>order_date</code>, <code>status</code></div>
         </div>
         """, unsafe_allow_html=True)
     with col_l2:
         st.markdown("""
-        <div class="arch-card">
-            <h4>⚡ 2. Razorpay Gateway</h4>
-            <p style="color:#94a3b8; font-size:0.9rem;">Transaction fees, GST tax, and settlement batches.</p>
-            <hr style="border-color:#263248; margin:8px 0;">
-            <p style="font-size:0.85rem;"><code>payment_id</code>, <code>fee</code>, <code>tax</code>, <code>net_amount</code></p>
+        <div class="spec-card">
+            <div class="spec-title">2. Razorpay Gateway Ledger</div>
+            <p class="spec-desc">Processed payment events, MDR processing fees, 18% GST tax deductions, and batch settlement IDs.</p>
+            <div class="spec-meta">Primary Schema: <code>payment_id</code>, <code>fee</code>, <code>tax</code>, <code>net_amount</code>, <code>settlement_id</code></div>
         </div>
         """, unsafe_allow_html=True)
     with col_l3:
         st.markdown("""
-        <div class="arch-card">
-            <h4>🏦 3. Bank Statement</h4>
-            <p style="color:#94a3b8; font-size:0.9rem;">Aggregated deposits credited to the merchant account.</p>
-            <hr style="border-color:#263248; margin:8px 0;">
-            <p style="font-size:0.85rem;"><code>utr_number</code>, <code>deposit_amount</code>, <code>deposit_date</code></p>
+        <div class="spec-card">
+            <div class="spec-title">3. Bank Statement Deposits</div>
+            <p class="spec-desc">Actual bulk settlement credits received in the merchant's nodal bank account.</p>
+            <div class="spec-meta">Primary Schema: <code>utr_number</code>, <code>deposit_amount</code>, <code>deposit_date</code>, <code>description</code></div>
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("### 🚀 4-Phase Reconciliation Pipeline")
+    st.markdown("### Reconciliation Pipeline Stages")
 
     p_c1, p_c2, p_c3, p_c4 = st.columns(4)
     with p_c1:
         st.markdown("""
-        <div class="arch-card">
-            <span class="phase-badge badge-low">PHASE 1</span>
-            <h5 style="margin-top:8px;">Direct Key Match</h5>
-            <p style="color:#94a3b8; font-size:0.85rem;">Deterministic O(1) hash table lookup by <code>order_id</code>. Solves ~90% of volume and flags fee/tax math discrepancies instantly.</p>
+        <div class="spec-card">
+            <span class="phase-badge badge-low">STAGE 1</span>
+            <div class="spec-title" style="margin-top:8px;">Direct Key Match</div>
+            <p class="spec-desc">Deterministic O(1) hash index matching by order_id. Resolves ~90% of volume and validates fee calculation arithmetic.</p>
         </div>
         """, unsafe_allow_html=True)
     with p_c2:
         st.markdown("""
-        <div class="arch-card">
-            <span class="phase-badge badge-low">PHASE 2</span>
-            <h5 style="margin-top:8px;">Settlement Match</h5>
-            <p style="color:#94a3b8; font-size:0.85rem;">Groups Razorpay transactions by <code>settlement_id</code>, aggregates net batch amounts, and regex-matches against bank deposits.</p>
+        <div class="spec-card">
+            <span class="phase-badge badge-low">STAGE 2</span>
+            <div class="spec-title" style="margin-top:8px;">Settlement Match</div>
+            <p class="spec-desc">Aggregates gateway batches by settlement_id, sums net amounts, and matches against bank deposits using regex extraction.</p>
         </div>
         """, unsafe_allow_html=True)
     with p_c3:
         st.markdown("""
-        <div class="arch-card">
-            <span class="phase-badge badge-medium">PHASE 3</span>
-            <h5 style="margin-top:8px;">Subset-Sum Graph</h5>
-            <p style="color:#94a3b8; font-size:0.85rem;">Solves multi-deposit split settlements with bounded combinatorial pruning to guarantee real-time execution without NP-hard hangs.</p>
+        <div class="spec-card">
+            <span class="phase-badge badge-medium">STAGE 3</span>
+            <div class="spec-title" style="margin-top:8px;">Combinatorial Graph</div>
+            <p class="spec-desc">Evaluates multi-deposit split settlements with bounded combinatorial pruning to guarantee real-time execution.</p>
         </div>
         """, unsafe_allow_html=True)
     with p_c4:
         st.markdown("""
-        <div class="arch-card">
-            <span class="phase-badge badge-high">PHASE 4</span>
-            <h5 style="margin-top:8px;">Parallel AI Agents</h5>
-            <p style="color:#94a3b8; font-size:0.85rem;">Remaining edge cases (~5%) are chunked and investigated across a parallel swarm of Groq, NVIDIA NIM, and Gemini models.</p>
+        <div class="spec-card">
+            <span class="phase-badge badge-high">STAGE 4</span>
+            <div class="spec-title" style="margin-top:8px;">AI Investigation</div>
+            <p class="spec-desc">Remaining edge cases are analyzed across a parallel multi-provider cascade (Groq, NVIDIA NIM, Gemini) for root cause analysis.</p>
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.info("💡 **Ready to test?** Click **'📂 Load Sample Data (50 orders)'** or **'📊 Generate 500 Orders'** above, then click **RECONCILE** to see the pipeline in action!")
+    st.info("Select a dataset above (or upload custom CSVs) and click **RECONCILE** to initiate the multi-stage pipeline.")
+
 
