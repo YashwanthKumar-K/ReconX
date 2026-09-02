@@ -92,6 +92,17 @@ st.markdown('<h1 class="title-gradient">ReconX</h1>', unsafe_allow_html=True)
 st.markdown("**Multi-Way Ledger Reconciliation Engine** — Algorithms for 95%, AI for the rest.")
 st.markdown("---")
 
+# ─── Sidebar Settings ────────────────────────────────────────────────────────
+with st.sidebar:
+    st.header("⚙️ Configuration")
+    st.markdown("Tweak matching parameters below:")
+    from engine.config import config
+    config.expected_fee_rate = st.number_input("Razorpay Fee Rate (%)", value=config.expected_fee_rate * 100, step=0.1) / 100.0
+    config.fee_rate_tolerance = st.number_input("Fee Tolerance (%)", value=config.fee_rate_tolerance * 100, step=0.1) / 100.0
+    config.amount_tolerance = st.number_input("Amount Tolerance (₹)", value=config.amount_tolerance, step=0.01)
+    st.markdown("---")
+    st.markdown("*These parameters adjust the strictness of Phase 1 (Deterministic Matcher).*")
+
 
 # ─── Session State ────────────────────────────────────────────────────────────
 
@@ -219,10 +230,24 @@ if data_dir or "data_dir" in st.session_state:
         progress_bar = st.progress(0, text="Starting reconciliation...")
 
         from engine.reconciliation_engine import run_reconciliation
+        from engine.csv_parser import CSVValidationError
 
         # Step 1: Deterministic matching (instant ~0.03s)
         progress_bar.progress(10, text="Phase 1-3: Running deterministic matching...")
-        report = run_reconciliation(data_dir=active_dir, use_ai=False, verbose=False)
+        
+        try:
+            report = run_reconciliation(data_dir=active_dir, use_ai=False, verbose=False)
+        except CSVValidationError as e:
+            progress_bar.empty()
+            st.error(f"🚨 **CSV Validation Error:** {str(e)}\n\nPlease check the required column names in the README and re-upload your files.")
+            st.session_state.running = False
+            st.stop()
+        except Exception as e:
+            progress_bar.empty()
+            st.error(f"🚨 **Unexpected Error:** {str(e)}")
+            st.session_state.running = False
+            st.stop()
+
         progress_bar.progress(50, text="Deterministic matching complete!")
 
         # Step 2: AI investigation

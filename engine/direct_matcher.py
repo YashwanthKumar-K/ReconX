@@ -7,10 +7,7 @@ Also handles fee-rate discrepancy detection deterministically.
 import pandas as pd
 from typing import Tuple
 
-# Expected fee rate and tolerance
-EXPECTED_FEE_RATE = 0.02  # 2%
-FEE_RATE_TOLERANCE = 0.003  # ±0.3% is acceptable
-AMOUNT_TOLERANCE = 0.01  # ₹0.01 for floating point
+from engine.config import config
 
 
 def run_phase1(
@@ -98,7 +95,7 @@ def run_phase1(
         rz_row = rz_list[0]
 
         # Amount check
-        amount_match = abs(float(m_row["amount"]) - float(rz_row["amount"])) < AMOUNT_TOLERANCE
+        amount_match = abs(float(m_row["amount"]) - float(rz_row["amount"])) < config.amount_tolerance
 
         if not amount_match:
             anomalies.append({
@@ -125,10 +122,10 @@ def run_phase1(
         fee_note = None
         fee_anomaly = False
 
-        if abs(actual_fee_rate - EXPECTED_FEE_RATE) > FEE_RATE_TOLERANCE:
+        if abs(actual_fee_rate - config.expected_fee_rate) > config.fee_rate_tolerance:
             fee_anomaly = True
             fee_note = (
-                f"Fee rate discrepancy: expected ~{EXPECTED_FEE_RATE*100:.1f}%, "
+                f"Fee rate discrepancy: expected ~{config.expected_fee_rate*100:.1f}%, "
                 f"actual {actual_fee_rate*100:.2f}% "
                 f"(₹{rz_row['fee']} on ₹{rz_row['amount']}). "
                 f"This is a deterministic detection — no AI needed."
@@ -149,7 +146,7 @@ def run_phase1(
                     "fee": float(rz_row["fee"]),
                     "tax": float(rz_row["tax"]),
                     "net_amount": float(rz_row["net_amount"]),
-                    "expected_fee_rate": EXPECTED_FEE_RATE,
+                    "config.expected_fee_rate": config.expected_fee_rate,
                     "actual_fee_rate": round(actual_fee_rate, 4),
                 },
                 "note": fee_note,
@@ -160,7 +157,7 @@ def run_phase1(
             continue
 
         # Check for partial refund: merchant amount matches but net is suspiciously low
-        expected_net = round(float(m_row["amount"]) * (1 - EXPECTED_FEE_RATE * (1 + 0.18)), 2)
+        expected_net = round(float(m_row["amount"]) * (1 - config.expected_fee_rate * (1 + 0.18)), 2)
         actual_net = float(rz_row["net_amount"])
         net_diff = abs(expected_net - actual_net)
 

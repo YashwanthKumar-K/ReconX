@@ -8,9 +8,19 @@ from pathlib import Path
 from typing import Optional
 
 
+class CSVValidationError(Exception):
+    """Raised when an uploaded CSV is missing required columns."""
+    pass
+
+def validate_columns(df: pd.DataFrame, required: list, filename: str):
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise CSVValidationError(f"'{filename}' is missing required columns: {', '.join(missing)}")
+
 def parse_merchant_orders(path: str) -> pd.DataFrame:
     """Parse merchant_orders.csv into a clean DataFrame."""
     df = pd.read_csv(path)
+    validate_columns(df, ["order_id", "amount", "order_date", "status"], "merchant_orders.csv")
     df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
     df["order_date"] = pd.to_datetime(df["order_date"])
     df["order_id"] = df["order_id"].astype(str).str.strip()
@@ -21,6 +31,7 @@ def parse_merchant_orders(path: str) -> pd.DataFrame:
 def parse_razorpay_transactions(path: str) -> pd.DataFrame:
     """Parse razorpay_transactions.csv into a clean DataFrame."""
     df = pd.read_csv(path)
+    validate_columns(df, ["order_id", "payment_id", "settlement_id", "amount", "fee", "tax", "net_amount", "payment_date", "settlement_date", "status"], "razorpay_transactions.csv")
     for col in ["amount", "fee", "tax", "net_amount"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df["payment_date"] = pd.to_datetime(df["payment_date"])
@@ -35,6 +46,7 @@ def parse_razorpay_transactions(path: str) -> pd.DataFrame:
 def parse_bank_statement(path: str) -> pd.DataFrame:
     """Parse bank_statement.csv into a clean DataFrame."""
     df = pd.read_csv(path)
+    validate_columns(df, ["utr_number", "deposit_amount", "deposit_date", "description"], "bank_statement.csv")
     df["deposit_amount"] = pd.to_numeric(df["deposit_amount"], errors="coerce")
     df["deposit_date"] = pd.to_datetime(df["deposit_date"]).dt.date
     df["utr_number"] = df["utr_number"].astype(str).str.strip()

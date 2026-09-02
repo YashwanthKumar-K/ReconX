@@ -62,8 +62,11 @@ def run_phase2(
 
             date_diff = abs((b_date - settlement_date).days) if hasattr(b_date, '__sub__') else 999
 
-            # Check description for settlement_id
-            desc_match = str(setl_id) in str(b_row.get("description", ""))
+            # Check description for settlement_id using regex (handles bank text noise)
+            import re
+            desc_text = str(b_row.get("description", ""))
+            extracted_setls = re.findall(r"(setl_[a-zA-Z0-9]+)", desc_text)
+            desc_match = str(setl_id) in extracted_setls or str(setl_id) in desc_text
 
             if amount_diff < AMOUNT_TOLERANCE and date_diff <= DATE_TOLERANCE_DAYS:
                 if amount_diff < best_diff:
