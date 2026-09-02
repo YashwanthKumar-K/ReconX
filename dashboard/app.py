@@ -162,7 +162,7 @@ with st.sidebar:
         """
         - **Primary:** Groq (`GPT-OSS 120B`)
         - **Secondary:** NVIDIA NIM (`Llama 3.1 70B`)
-        - **Tertiary:** Google GenAI (`Gemini 3.6 Flash`)
+        - **Tertiary:** Google GenAI (`Gemini Flash`)
         - **Fallback:** Deterministic Rule Classifier
         """
     )
