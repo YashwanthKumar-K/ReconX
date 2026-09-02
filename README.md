@@ -9,6 +9,7 @@
     <img src="https://img.shields.io/badge/AI%20Stack-Groq%20%7C%20NVIDIA%20NIM%20%7C%20Gemini-green.svg" alt="AI Stack">
     <img src="https://img.shields.io/badge/Detection%20Accuracy-98.1%25-brightgreen.svg" alt="Detection Accuracy">
     <img src="https://img.shields.io/badge/AI%20Diagnosis%20Accuracy-100.0%25-success.svg" alt="AI Accuracy">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
   </p>
 </div>
 
