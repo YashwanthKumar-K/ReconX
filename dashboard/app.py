@@ -384,13 +384,14 @@ if st.session_state.report is not None:
 
     st.markdown("---")
 
-    # ─── Phase Funnel ─────────────────────────────────────────────────
-    tab_funnel, tab_matched, tab_anomalies, tab_settlements, tab_accuracy = st.tabs([
-        "📊 Phase Breakdown",
-        "✅ Matched Transactions",
-        "⚠️ Anomalies",
-        "🏦 Settlements",
-        "🎯 Accuracy Report",
+    # ─── Phase Funnel & Tabs ──────────────────────────────────────────
+    tab_funnel, tab_matched, tab_anomalies, tab_settlements, tab_accuracy, tab_export = st.tabs([
+        "Phase Breakdown",
+        "Matched Transactions",
+        "Anomalies",
+        "Settlements",
+        "Accuracy & Analytics",
+        "Export Reports",
     ])
 
     with tab_funnel:
@@ -609,24 +610,14 @@ if st.session_state.report is not None:
             st.info("No settlement data available.")
 
     with tab_accuracy:
-        st.markdown("### Accuracy Report — Ground Truth Validation")
-
         scores = report.get("scores") or {}
 
-        if not scores or scores.get("engine_accuracy") is None:
-            st.info(
-                "**Ground truth not available for uploaded data.**\n\n"
-                "Accuracy scoring requires a `ground_truth.csv` answer key. "
-                "This tab shows live results when using the **Load Sample Data** or "
-                "**Generate 500 Orders** buttons which include a labeled ground truth dataset."
-            )
-        else:
+        if scores.get("engine_accuracy") is not None:
+            st.markdown("### Ground Truth Validation & Benchmarks")
             st.markdown(
-                "This proves our engine and AI are actually correct, not just plausible. "
-                "Results are scored against a labeled ground truth dataset."
+                "Evaluates engine detection and AI classification accuracy against labeled ground truth."
             )
 
-            # Accuracy metrics
             col_acc1, col_acc2 = st.columns(2)
             with col_acc1:
                 st.markdown("#### Engine Detection Accuracy")
@@ -636,77 +627,73 @@ if st.session_state.report is not None:
                     title={"text": "Engine Accuracy %"},
                     gauge={
                         "axis": {"range": [0, 100]},
-                        "bar": {"color": "#4caf50"},
-                        "bgcolor": "#1a1f2e",
+                        "bar": {"color": "#22c55e"},
+                        "bgcolor": "#141a26",
                         "steps": [
-                            {"range": [0, 60], "color": "#ff4b4b33"},
-                            {"range": [60, 85], "color": "#ffa50033"},
-                            {"range": [85, 100], "color": "#4caf5033"},
+                            {"range": [0, 60], "color": "rgba(239, 68, 68, 0.2)"},
+                            {"range": [60, 85], "color": "rgba(245, 158, 11, 0.2)"},
+                            {"range": [85, 100], "color": "rgba(34, 197, 94, 0.2)"},
                         ],
                     },
                 ))
                 fig_eng.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)",
                     font=dict(color="white"),
-                    height=250,
+                    height=240,
                     margin=dict(l=20, r=20, t=40, b=20),
                 )
                 st.plotly_chart(fig_eng, width='stretch')
-                ec = scores.get("engine_correct", "?")
-                et = scores.get("engine_total", "?")
-                st.write(f"Correctly classified: **{ec}/{et}** records")
+                ec = scores.get("engine_correct", 0)
+                et = scores.get("engine_total", 0)
+                st.write(f"Correctly identified: **{ec}/{et}** records")
 
             with col_acc2:
                 st.markdown("#### AI Classification Accuracy")
                 fig_ai = go.Figure(go.Indicator(
                     mode="gauge+number",
-                    value=scores["ai_accuracy"],
+                    value=scores.get("ai_accuracy", 0.0),
                     title={"text": "AI Accuracy %"},
                     gauge={
                         "axis": {"range": [0, 100]},
-                        "bar": {"color": "#667eea"},
-                        "bgcolor": "#1a1f2e",
+                        "bar": {"color": "#3b82f6"},
+                        "bgcolor": "#141a26",
                         "steps": [
-                            {"range": [0, 60], "color": "#ff4b4b33"},
-                            {"range": [60, 85], "color": "#ffa50033"},
-                            {"range": [85, 100], "color": "#4caf5033"},
+                            {"range": [0, 60], "color": "rgba(239, 68, 68, 0.2)"},
+                            {"range": [60, 85], "color": "rgba(245, 158, 11, 0.2)"},
+                            {"range": [85, 100], "color": "rgba(59, 130, 246, 0.2)"},
                         ],
                     },
                 ))
                 fig_ai.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)",
                     font=dict(color="white"),
-                    height=250,
+                    height=240,
                     margin=dict(l=20, r=20, t=40, b=20),
                 )
                 st.plotly_chart(fig_ai, width='stretch')
-                st.write(f"Correctly classified: **{scores['ai_correct']}/{scores['ai_total']}** anomalies")
+                st.write(f"Correctly diagnosed: **{scores.get('ai_correct', 0)}/{scores.get('ai_total', 0)}** anomalies")
 
-            # AI classification details
             if scores.get("ai_details"):
-                st.markdown("#### Classification Details")
+                st.markdown("#### Ground Truth vs AI Predictions")
                 try:
                     details_df = pd.DataFrame(scores["ai_details"])
-                    st.dataframe(details_df, width='stretch', height=280)
+                    st.dataframe(details_df, width='stretch', height=260)
                 except Exception as e:
                     st.warning(f"Could not format classification details: {e}")
 
-            # Undetected anomalies
             if scores.get("undetected_anomalies"):
-                st.markdown("#### Undetected Anomalies (Honest Exception List)")
-                st.warning(f"{len(scores['undetected_anomalies'])} ground-truth anomalies were not detected by the engine:")
+                st.markdown("#### Undetected Exceptions")
+                st.warning(f"{len(scores['undetected_anomalies'])} ground-truth anomalies were not captured by the deterministic rules:")
                 try:
                     undetected_df = pd.DataFrame(scores["undetected_anomalies"])
-                    st.dataframe(undetected_df, width='stretch', height=200)
+                    st.dataframe(undetected_df, width='stretch', height=180)
                 except Exception:
-                    for u in scores["undetected_anomalies"][:20]:
-                        st.write(f"- **{u.get('order_id', '')}**: {u.get('missed_anomaly_type', '')}")
+                    pass
             else:
-                st.success("All injected anomalies were detected!")
+                st.success("All injected ground truth anomalies were successfully detected!")
 
-            # Confusion matrix
             if scores.get("confusion_matrix"):
-                st.markdown("#### Confusion Matrix")
+                st.markdown("#### Anomaly Confusion Matrix")
                 try:
                     cm = scores["confusion_matrix"]
                     cm_df = pd.DataFrame(cm).fillna(0).astype(int)
@@ -714,22 +701,45 @@ if st.session_state.report is not None:
                 except Exception:
                     st.dataframe(pd.DataFrame(scores.get("confusion_matrix", {})), width='stretch')
 
+        else:
+            # Custom uploaded dataset (no ground truth key)
+            st.markdown("### Anomaly Telemetry & Diagnostics")
+            st.markdown(
+                "Operational telemetry for uploaded dataset (Ground truth benchmark key is not attached)."
+            )
 
-    # ─── Performance ──────────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown(
-        f"*Reconciliation completed in **{report.get('elapsed_seconds', '?')}s** "
-        f"| {report['total_merchant_orders']} orders processed "
-        f"| Algorithms do the math, AI explains the why.*"
-    )
+            anomalies = report.get("anomalies", [])
+            if anomalies:
+                type_counts = {}
+                conf_counts = {"high": 0, "medium": 0, "low": 0}
+                manual_count = 0
 
-    # ─── Export ──────────────────────────────────────────────────────
-    if "report" in st.session_state and st.session_state.report:
-        st.markdown("### Export Results")
+                for a in anomalies:
+                    t = a.get("ai_classification") or a.get("anomaly_type") or "UNKNOWN"
+                    type_counts[t] = type_counts.get(t, 0) + 1
+                    conf = a.get("ai_confidence", "low").lower()
+                    conf_counts[conf] = conf_counts.get(conf, 0) + 1
+                    if a.get("needs_manual_review"):
+                        manual_count += 1
+
+                c_m1, c_m2, c_m3 = st.columns(3)
+                c_m1.metric("Flagged Exceptions", len(anomalies))
+                c_m2.metric("High Confidence Diagnoses", conf_counts.get("high", 0))
+                c_m3.metric("Manual Review Queue", manual_count)
+
+                st.markdown("#### Anomaly Type Distribution")
+                type_df = pd.DataFrame(list(type_counts.items()), columns=["Anomaly Type", "Count"]).sort_values("Count", ascending=False)
+                st.dataframe(type_df, width='stretch', height=240)
+            else:
+                st.success("Clean ledger match: 0 exceptions detected.")
+
+    with tab_export:
+        st.markdown("### Export Reconciliation Reports")
+        st.markdown("Download audited ledger reconciliation summaries and detailed anomaly investigation sheets:")
+
         exp_col1, exp_col2 = st.columns(2)
 
         try:
-            # CSV anomaly report
             with exp_col1:
                 anomaly_rows = [{
                     "order_id":             a.get("order_id", ""),
@@ -746,7 +756,7 @@ if st.session_state.report is not None:
                 csv_buf = _io.StringIO()
                 pd.DataFrame(anomaly_rows).to_csv(csv_buf, index=False)
                 st.download_button(
-                    label="Download Anomaly Report (CSV)",
+                    label="Download Exception Report (CSV)",
                     data=csv_buf.getvalue(),
                     file_name="reconx_anomaly_report.csv",
                     mime="text/csv",
@@ -754,9 +764,7 @@ if st.session_state.report is not None:
                     help="All flagged anomalies with AI explanations and suggested resolutions",
                 )
 
-            # JSON summary report (lightweight for large data)
             with exp_col2:
-                # Keep full export clean and serializable
                 clean_report = {
                     "total_merchant_orders": report.get("total_merchant_orders", 0),
                     "total_razorpay_transactions": report.get("total_razorpay_transactions", 0),
@@ -772,15 +780,28 @@ if st.session_state.report is not None:
                 }
                 json_data = json.dumps(clean_report, indent=2, default=str)
                 st.download_button(
-                    label="Download Summary Report (JSON)",
+                    label="Download Full Audit Summary (JSON)",
                     data=json_data,
                     file_name="reconx_full_report.json",
                     mime="application/json",
                     use_container_width=True,
                     help="Complete reconciliation report with phase stats, scores, and all anomaly records",
                 )
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("#### Anomaly Data Export Preview")
+            if report.get("anomalies"):
+                st.dataframe(pd.DataFrame(anomaly_rows), width='stretch', height=300)
         except Exception as e:
             st.error(f"Error generating export files: {e}")
+
+    # ─── Performance Footer ───────────────────────────────────────────
+    st.markdown("---")
+    st.markdown(
+        f"*Reconciliation completed in **{report.get('elapsed_seconds', '?')}s** "
+        f"| {report['total_merchant_orders']} orders processed "
+        f"| Multi-Way Deterministic Validation & AI Diagnostics.*"
+    )
 
 
 # ─── Footer ──────────────────────────────────────────────────────────────────
