@@ -203,6 +203,61 @@ with col_load3:
         label_visibility="collapsed",
     )
 
+# ─── CSV Format Guide ─────────────────────────────────────────────────────────
+with st.expander("📋 CSV Format Guide — Required columns & example rows", expanded=False):
+    st.markdown("""
+Upload **3 CSV files** (optionally a 4th for accuracy scoring). File names must contain the keywords shown below so ReconX can auto-detect them.
+
+---
+
+#### 1. `merchant_orders.csv` — Your ERP / Order System Export
+| Column | Type | Example | Notes |
+|--------|------|---------|-------|
+| `order_id` | string | `ORD_1001` | **Required** — unique order identifier |
+| `amount` | numeric | `3457.69` | **Required** — gross order amount in ₹ |
+| `order_date` | datetime | `2026-08-20 18:01:00` | **Required** — any parseable date format |
+| `status` | string | `completed` | **Required** — e.g. `completed`, `pending`, `refunded` |
+| `customer_name` | string | `Pooja Desai` | Optional |
+| `product` | string | `Webcam` | Optional |
+
+---
+
+#### 2. `razorpay_transactions.csv` — Razorpay Gateway Export
+| Column | Type | Example | Notes |
+|--------|------|---------|-------|
+| `order_id` | string | `ORD_1001` | **Required** — links to merchant order |
+| `payment_id` | string | `pay_HSAHXTHV` | **Required** |
+| `settlement_id` | string | `setl_001` | **Required** |
+| `amount` | numeric | `3457.69` | **Required** — gross charged amount |
+| `fee` | numeric | `69.15` | **Required** — Razorpay MDR fee |
+| `tax` | numeric | `12.45` | **Required** — GST on fee |
+| `net_amount` | numeric | `3376.09` | **Required** — amount after fee+tax deduction |
+| `payment_date` | datetime | `2026-08-20 18:02:00` | **Required** |
+| `settlement_date` | date | `2026-08-21` | **Required** |
+| `status` | string | `captured` | **Required** — e.g. `captured`, `refunded` |
+
+---
+
+#### 3. `bank_statement.csv` — Nodal Bank Account Statement
+| Column | Type | Example | Notes |
+|--------|------|---------|-------|
+| `utr_number` | string | `UTR1QW6AHF7` | **Required** — unique bank transaction reference |
+| `deposit_amount` | numeric | `11302.15` | **Required** — amount credited to bank |
+| `deposit_date` | date | `2026-08-21` | **Required** |
+| `description` | string | `RAZORPAY SETTLEMENT setl_001` | **Required** — must contain settlement ID for matching |
+| `bank_ref` | string | `REF_VP1IEIXW` | Optional |
+
+---
+
+#### 4. `ground_truth.csv` — Optional (enables Accuracy Scoring tab)
+| Column | Type | Example |
+|--------|------|---------|
+| `order_id` | string | `ORD_1001` |
+| `injected_anomaly_type` | string | `TIMING_MISMATCH` |
+
+> **Tip:** If your file names already contain the keywords `merchant`, `razorpay`/`transaction`, and `bank`/`statement`, ReconX will detect them automatically regardless of the exact filename.
+""")
+
 # Handle data loading
 data_dir = None
 

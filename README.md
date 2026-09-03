@@ -192,6 +192,57 @@ ReconX/
 
 ---
 
+## 📄 Input CSV Format Reference
+
+ReconX requires **3 CSV files** (and optionally a 4th for benchmark accuracy scoring). Upload files whose names contain the keywords `merchant`, `razorpay`/`transaction`, and `bank`/`statement` — the engine auto-detects them.
+
+### 1. `merchant_orders.csv` — ERP / Order System Export
+
+| Column | Type | Example | Required |
+|--------|------|---------|----------|
+| `order_id` | string | `ORD_1001` | ✅ |
+| `amount` | numeric (₹) | `3457.69` | ✅ |
+| `order_date` | datetime | `2026-08-20 18:01:00` | ✅ |
+| `status` | string | `completed` | ✅ |
+| `customer_name` | string | `Pooja Desai` | optional |
+| `product` | string | `Webcam` | optional |
+
+### 2. `razorpay_transactions.csv` — Razorpay Gateway Export
+
+| Column | Type | Example | Required |
+|--------|------|---------|----------|
+| `order_id` | string | `ORD_1001` | ✅ |
+| `payment_id` | string | `pay_HSAHXTHV` | ✅ |
+| `settlement_id` | string | `setl_001` | ✅ |
+| `amount` | numeric (₹) | `3457.69` | ✅ |
+| `fee` | numeric (₹) | `69.15` | ✅ |
+| `tax` | numeric (₹) | `12.45` | ✅ |
+| `net_amount` | numeric (₹) | `3376.09` | ✅ |
+| `payment_date` | datetime | `2026-08-20 18:02:00` | ✅ |
+| `settlement_date` | date | `2026-08-21` | ✅ |
+| `status` | string | `captured` | ✅ |
+
+### 3. `bank_statement.csv` — Nodal Bank Statement
+
+| Column | Type | Example | Required |
+|--------|------|---------|----------|
+| `utr_number` | string | `UTR1QW6AHF7` | ✅ |
+| `deposit_amount` | numeric (₹) | `11302.15` | ✅ |
+| `deposit_date` | date | `2026-08-21` | ✅ |
+| `description` | string | `RAZORPAY SETTLEMENT setl_001` | ✅ — must contain settlement ID |
+| `bank_ref` | string | `REF_VP1IEIXW` | optional |
+
+### 4. `ground_truth.csv` — Optional (enables Accuracy Scoring)
+
+| Column | Type | Example |
+|--------|------|---------|
+| `order_id` | string | `ORD_1001` |
+| `injected_anomaly_type` | string | `TIMING_MISMATCH` |
+
+> **Note:** The `description` field in `bank_statement.csv` is used to extract settlement IDs via regex. Values like `"RAZORPAY SETTLEMENT setl_001"`, `"CMS/setl_001"`, or `"NEFT setl_001 PART2"` all work correctly.
+
+---
+
 ## 🚀 Easy Installation & Running Across Any Device
 
 ### 🌐 Option 1: Live Cloud Web Application (Instant Access)
