@@ -87,8 +87,6 @@ each shaped like:
     "needs_manual_review": true or false
 }
 
-CRITICAL RULE: If the `net_amount` is lower than the original `amount`, you MUST calculate the expected tax and fee. If the actual deducted tax/fee is higher than the standard 2% fee + 18% GST, you must label it FEE_DISCREPANCY, NOT PARTIAL_REFUND. If the math perfectly matches standard fees but the net is still short, ONLY THEN assume PARTIAL_REFUND.
-
 IMPORTANT:
 - Use Rs. prefix for amounts (not rupee symbol)
 - Reference specific dates and IDs from the context
@@ -244,6 +242,8 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
                 entry["order_date"] = m_data.get("order_date")
             if isinstance(r_data, dict):
                 entry["razorpay_amount"] = r_data.get("amount")
+                entry["fee"] = r_data.get("fee")
+                entry["tax"] = r_data.get("tax")
                 entry["net_amount"] = r_data.get("net_amount")
                 entry["payment_date"] = r_data.get("payment_date")
                 entry["settlement_date"] = r_data.get("settlement_date")
