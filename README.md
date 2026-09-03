@@ -250,10 +250,23 @@ ReconX requires **3 CSV files** (and optionally a 4th for benchmark accuracy sco
 
 ### 4. `ground_truth.csv` — Optional (enables Accuracy Scoring)
 
-| Column | Type | Example |
-|--------|------|---------|
-| `order_id` | string | `ORD_1001` |
-| `injected_anomaly_type` | string | `TIMING_MISMATCH` |
+| Column | Type | Example | Required |
+|--------|------|---------|----------|
+| `order_id` | string | `ORD_1001` | ✅ |
+| `injected_anomaly_type` | string | `TIMING_MISMATCH` | ✅ — keyword from the reference table below |
+
+#### 🏷️ Supported Anomaly Keywords & Reference Descriptions (`injected_anomaly_type`)
+
+| Canonical Keyword | Supported Aliases | Relative Anomaly Description |
+| :--- | :--- | :--- |
+| **`NONE`** | — | **Clean Transaction**: Order, Razorpay payment, and bank deposit match with zero discrepancies. |
+| **`TIMING_MISMATCH`** | `TIMING_ISSUE` | **Settlement Timing Lag**: Gateway capture or settlement spans across midnight cut-offs, weekends, or bank holidays. |
+| **`AMOUNT_DISCREPANCY`** | `AMOUNT_MISMATCH` | **Gross Amount Mismatch**: Gross order amount recorded in merchant ERP differs from amount charged by Razorpay. |
+| **`FEE_DISCREPANCY`** | `FEE_TAX_MISMATCH` | **Fee/Tax Calculation Error**: Gateway processing fees or GST deviate from contractual 2% MDR + 18% GST rates. |
+| **`MISSING_RECORD`** | `MISSING_IN_RAZORPAY`, `MISSING_IN_GATEWAY`, `MISSING_IN_MERCHANT` | **Missing in Gateway**: Order exists in merchant database but was never captured in Razorpay (e.g. dropped webhook/failed capture). |
+| **`PARTIAL_REFUND`** | — | **Partial Refund Issued**: Payment was captured, but a partial customer refund reduced the net settlement payout. |
+| **`SPLIT_SETTLEMENT`** | — | **Split Bank Deposit**: A single gateway settlement batch was deposited as multiple split bank credits across dates. |
+| **`DUPLICATE_PAYMENT`** | — | **Duplicate Capture**: Multiple payment transactions were recorded against the exact same order ID. |
 
 > **Note:** The `description` field in `bank_statement.csv` is used to extract settlement IDs via regex. Values like `"RAZORPAY SETTLEMENT setl_001"`, `"CMS/setl_001"`, or `"NEFT setl_001 PART2"` all work correctly.
 

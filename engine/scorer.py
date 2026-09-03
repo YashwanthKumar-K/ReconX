@@ -8,7 +8,7 @@ import pandas as pd
 from typing import Optional
 
 
-# Mapping from AI classifications back to ground truth anomaly types
+# Mapping from AI classifications and external ground truth aliases to canonical anomaly types
 AI_TO_GROUND_TRUTH_MAP = {
     "TIMING_MISMATCH": "TIMING_MISMATCH",
     "TIMING_ISSUE": "TIMING_MISMATCH",
@@ -18,7 +18,9 @@ AI_TO_GROUND_TRUTH_MAP = {
     "MISSING_RECORD": "MISSING_RECORD",
     "MISSING_IN_RAZORPAY": "MISSING_RECORD",
     "MISSING_IN_MERCHANT": "MISSING_RECORD",
+    "MISSING_IN_GATEWAY": "MISSING_RECORD",
     "FEE_DISCREPANCY": "FEE_DISCREPANCY",
+    "FEE_TAX_MISMATCH": "FEE_DISCREPANCY",
     "AMOUNT_DISCREPANCY": "AMOUNT_DISCREPANCY",
     "AMOUNT_MISMATCH": "AMOUNT_DISCREPANCY",
     "REQUIRES_MANUAL_REVIEW": "REQUIRES_MANUAL_REVIEW",
@@ -173,11 +175,12 @@ def score_results(
         if is_real_ai:
             ai_only_total += 1
         
-        # Normalize the AI classification (handle our internal name aliases)
+        # Normalize both AI classification and Ground Truth label to handle aliases
         normalized_ai = AI_TO_GROUND_TRUTH_MAP.get(ai_class, ai_class)
+        normalized_gt = AI_TO_GROUND_TRUTH_MAP.get(gt_type, gt_type)
 
         # Accept match on normalized name OR raw AI class (handles external GT label variations)
-        is_correct = (normalized_ai == gt_type) or (ai_class == gt_type)
+        is_correct = (normalized_ai == normalized_gt) or (normalized_ai == gt_type) or (ai_class == gt_type)
         if is_correct:
             ai_correct += 1
             if is_real_ai:

@@ -250,10 +250,22 @@ Upload **3 CSV files** (optionally a 4th for accuracy scoring). File names must 
 ---
 
 #### 4. `ground_truth.csv` — Optional (enables Accuracy Scoring tab)
-| Column | Type | Example |
-|--------|------|---------|
-| `order_id` | string | `ORD_1001` |
-| `injected_anomaly_type` | string | `TIMING_MISMATCH` |
+| Column | Type | Example | Notes |
+|--------|------|---------|-------|
+| `order_id` | string | `ORD_1001` | **Required** — links to merchant order |
+| `injected_anomaly_type` | string | `TIMING_MISMATCH` | **Required** — anomaly keyword from the table below |
+
+##### 🏷️ Supported Anomaly Keywords & Descriptions (`injected_anomaly_type`):
+| Keyword | Supported Aliases | Anomaly Description |
+|---|---|---|
+| `NONE` | — | **Clean Transaction**: Order, gateway payment, and bank deposit match with zero discrepancies. |
+| `TIMING_MISMATCH` | `TIMING_ISSUE` | **Settlement Timing Lag**: Gateway capture or settlement spans across midnight cut-offs, weekends, or bank holidays. |
+| `AMOUNT_DISCREPANCY` | `AMOUNT_MISMATCH` | **Gross Amount Mismatch**: Gross order amount recorded in ERP differs from amount charged by Razorpay. |
+| `FEE_DISCREPANCY` | `FEE_TAX_MISMATCH` | **Fee/Tax Calculation Error**: Gateway processing fees or GST deviate from contractual 2% MDR + 18% GST rates. |
+| `MISSING_RECORD` | `MISSING_IN_RAZORPAY`, `MISSING_IN_GATEWAY` | **Missing in Gateway**: Order exists in merchant database but was never captured in Razorpay (dropped webhook/abandoned). |
+| `PARTIAL_REFUND` | — | **Partial Refund Issued**: Payment was captured, but a partial refund reduced the net settlement payout. |
+| `SPLIT_SETTLEMENT` | — | **Split Bank Deposit**: A single gateway settlement batch was deposited as multiple split bank credits across dates. |
+| `DUPLICATE_PAYMENT` | — | **Duplicate Capture**: Multiple payment transactions were recorded against the exact same order ID. |
 
 > **Tip:** If your file names already contain the keywords `merchant`, `razorpay`/`transaction`, and `bank`/`statement`, ReconX will detect them automatically regardless of the exact filename.
 """)

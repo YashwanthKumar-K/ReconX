@@ -140,19 +140,35 @@ def run_phase1(
             matched_razorpay_ids.add(rz_row["payment_id"])
             continue
 
-        # Fee rate check (deterministic — NOT sent to AI)
-        actual_fee_rate = float(rz_row["fee"]) / float(rz_row["amount"]) if float(rz_row["amount"]) > 0 else 0
+        # Fee and tax check (deterministic — checks both MDR fee and GST tax)
+        actual_fee = float(rz_row["fee"])
+        actual_tax = float(rz_row.get("tax", 0)) if "tax" in rz_row and not _pd.isna(rz_row["tax"]) else 0.0
+        amount_val = float(rz_row["amount"])
+        
+        expected_fee = round(amount_val * config.expected_fee_rate, 2)
+        expected_tax = round(expected_fee * 0.18, 2)
+        
+        actual_fee_rate = actual_fee / amount_val if amount_val > 0 else 0
+        fee_rate_discrepancy = abs(actual_fee_rate - config.expected_fee_rate) > config.fee_rate_tolerance
+        tax_discrepancy = abs(actual_tax - expected_tax) > 0.50 if actual_tax > 0 else False
+        
         fee_note = None
-        fee_anomaly = False
+        fee_anomaly = fee_rate_discrepancy or tax_discrepancy
 
-        if abs(actual_fee_rate - config.expected_fee_rate) > config.fee_rate_tolerance:
-            fee_anomaly = True
-            fee_note = (
-                f"Fee rate discrepancy: expected ~{config.expected_fee_rate*100:.1f}%, "
-                f"actual {actual_fee_rate*100:.2f}% "
-                f"(₹{rz_row['fee']} on ₹{rz_row['amount']}). "
-                f"This is a deterministic detection — no AI needed."
-            )
+        if fee_anomaly:
+            if tax_discrepancy and not fee_rate_discrepancy:
+                fee_note = (
+                    f"GST Tax discrepancy: expected GST ~₹{expected_tax:.2f} (18% on ₹{actual_fee:.2f}), "
+                    f"actual GST ₹{actual_tax:.2f}. MDR rate is normal ({actual_fee_rate*100:.1f}%), "
+                    f"but tax calculation deviates. This is a deterministic detection — no AI needed."
+                )
+            else:
+                fee_note = (
+                    f"Fee rate discrepancy: expected ~{config.expected_fee_rate*100:.1f}%, "
+                    f"actual {actual_fee_rate*100:.2f}% "
+                    f"(₹{actual_fee} on ₹{amount_val}). "
+                    f"This is a deterministic detection — no AI needed."
+                )
 
         if fee_anomaly:
             anomalies.append({
@@ -167,7 +183,7 @@ def run_phase1(
                     "payment_id": rz_row["payment_id"],
                     "amount": float(rz_row["amount"]),
                     "fee": float(rz_row["fee"]),
-                    "tax": float(rz_row["tax"]),
+                    "tax": float(rz_row.get("tax", 0)),
                     "net_amount": float(rz_row["net_amount"]),
                     "config.expected_fee_rate": config.expected_fee_rate,
                     "actual_fee_rate": round(actual_fee_rate, 4),
