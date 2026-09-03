@@ -346,12 +346,23 @@ if data_dir or "data_dir" in st.session_state:
     with col_r2:
         cache_path = os.path.join(active_dir, "cached_ai_results.json")
         has_cache = os.path.exists(cache_path)
-        use_cache = st.checkbox(
-            "Use Cached AI Results (Demo Mode)",
-            value=has_cache,
-            disabled=not has_cache,
-            help="Load pre-computed AI results instantly. Run once with Live AI to build the cache."
-        )
+        col_c1, col_c2 = st.columns([3, 2])
+        with col_c1:
+            use_cache = st.checkbox(
+                "Use Cached AI Results",
+                value=has_cache,
+                disabled=not has_cache,
+                help="Load pre-computed AI results instantly. Uncheck to run fresh Live AI."
+            )
+        with col_c2:
+            if has_cache and st.button("🗑️ Clear Cache", help="Clear cached results to force fresh AI run"):
+                try:
+                    if os.path.exists(cache_path):
+                        os.remove(cache_path)
+                    st.toast("Cache cleared! Next run will use live AI.", icon="🧹")
+                    st.rerun()
+                except Exception as _ce:
+                    st.warning(f"Clear failed: {_ce}")
     with col_r3:
         reconcile_btn = st.button("RECONCILE", type="primary", use_container_width=True)
 
@@ -750,11 +761,73 @@ if st.session_state.report is not None:
                 st.plotly_chart(fig_ai, width='stretch')
                 st.write(f"Correctly diagnosed: **{scores.get('ai_correct', 0)}/{scores.get('ai_total', 0)}** anomalies")
 
+            mismatches = scores.get("mismatches", [])
+            total_eval = len(scores.get("ai_details", []))
+            num_mismatches = len(mismatches)
+            num_correct = scores.get("ai_correct", 0)
+
+            st.markdown("---")
+            st.markdown("### 🎯 Ground Truth Discrepancy & Mismatch Inspector")
+
+            if num_mismatches > 0:
+                st.error(f"⚠️ **{num_mismatches} of {total_eval} anomalies did not match ground truth.** Review the mismatched records below:")
+                
+                # Dedicated Mismatches Table
+                st.markdown("#### ❌ Mismatched Anomalies")
+                m_rows = []
+                for m in mismatches:
+                    m_rows.append({
+                        "Order ID": m.get("order_id", ""),
+                        "Ground Truth (Expected)": m.get("ground_truth", ""),
+                        "Actual Classification": m.get("ai_classification", ""),
+                        "Provider": m.get("provider", ""),
+                        "Detection / AI Note": m.get("explanation", ""),
+                    })
+                m_df = pd.DataFrame(m_rows)
+                st.dataframe(m_df, width='stretch', height=min(350, max(150, (num_mismatches + 1) * 38)))
+
+                # Quick download button for mismatches
+                csv_buf = m_df.to_csv(index=False)
+                st.download_button(
+                    label=f"📥 Download {num_mismatches} Mismatches as CSV",
+                    data=csv_buf,
+                    file_name="ground_truth_mismatches.csv",
+                    mime="text/csv",
+                    help="Export only the anomalies that did not match ground truth for root-cause analysis"
+                )
+            else:
+                st.success("🎉 **Perfect Match (100%)!** Every single anomaly was correctly classified against the ground truth answer key.")
+
+            # Filterable Explorer for All Evaluations
             if scores.get("ai_details"):
-                st.markdown("#### Ground Truth vs AI Predictions")
+                st.markdown("#### 🔍 All Evaluated Anomalies Explorer")
+                filter_choice = st.radio(
+                    "Filter records:",
+                    [
+                        f"All Evaluated Records ({total_eval})",
+                        f"❌ Only Mismatches ({num_mismatches})",
+                        f"✅ Only Matches ({num_correct})",
+                    ],
+                    horizontal=True,
+                    key="gt_filter_radio"
+                )
+
+                display_details = scores["ai_details"]
+                if "Only Mismatches" in filter_choice:
+                    display_details = [d for d in display_details if not d.get("correct", False)]
+                elif "Only Matches" in filter_choice:
+                    display_details = [d for d in display_details if d.get("correct", False)]
+
                 try:
-                    details_df = pd.DataFrame(scores["ai_details"])
-                    st.dataframe(details_df, width='stretch', height=260)
+                    exp_rows = [{
+                        "Order ID": d.get("order_id", ""),
+                        "Status": d.get("status", "✅ MATCH" if d.get("correct") else "❌ MISMATCH"),
+                        "Ground Truth": d.get("ground_truth", ""),
+                        "AI Classification": d.get("ai_classification", ""),
+                        "Provider": d.get("provider", ""),
+                        "Note / Reason": d.get("explanation", ""),
+                    } for d in display_details]
+                    st.dataframe(pd.DataFrame(exp_rows), width='stretch', height=280)
                 except Exception as e:
                     st.warning(f"Could not format classification details: {e}")
 

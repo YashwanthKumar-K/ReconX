@@ -160,6 +160,9 @@ def score_results(
                 "ai_classification": ai_class,
                 "normalized": normalized_ai,
                 "correct": is_correct,
+                "status": "✅ MATCH" if is_correct else "❌ MISMATCH",
+                "provider": a.get("ai_provider", "Deterministic"),
+                "explanation": a.get("ai_explanation") or a.get("note", ""),
             })
             continue
 
@@ -192,10 +195,16 @@ def score_results(
             "ai_classification": ai_class,
             "normalized": normalized_ai,
             "correct": is_correct,
+            "status": "✅ MATCH" if is_correct else "❌ MISMATCH",
+            "provider": a.get("ai_provider", "Deterministic"),
+            "explanation": a.get("ai_explanation") or a.get("note", ""),
         })
 
     ai_accuracy = round(ai_correct / ai_total * 100, 1) if ai_total > 0 else 0.0
     ai_only_accuracy = round(ai_only_correct / ai_only_total * 100, 1) if ai_only_total > 0 else 0.0
+
+    # ─── Filter Mismatches ────────────────────────────────────────────────
+    mismatches = [d for d in ai_details if not d["correct"]]
 
     # ─── Confusion matrix (simplified) ────────────────────────────────────
     confusion = {}
@@ -224,6 +233,8 @@ def score_results(
         "ai_only_correct": ai_only_correct,
         "ai_only_total": ai_only_total,
         "ai_details": ai_details,
+        "mismatches": mismatches,
+        "total_mismatches": len(mismatches),
         "confusion_matrix": confusion,
         "undetected_anomalies": undetected,
     }
