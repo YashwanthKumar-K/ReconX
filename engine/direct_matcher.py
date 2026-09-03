@@ -94,6 +94,29 @@ def run_phase1(
 
         rz_row = rz_list[0]
 
+        import pandas as _pd
+        # Data corruption check (NaN propagation bug fix)
+        if _pd.isna(m_row["amount"]) or _pd.isna(rz_row["amount"]) or _pd.isna(rz_row["fee"]) or _pd.isna(rz_row["net_amount"]):
+            anomalies.append({
+                "order_id": order_id,
+                "anomaly_type": "REQUIRES_MANUAL_REVIEW",
+                "detected_in_phase": "Phase 1: Direct Key Matching",
+                "merchant_data": {
+                    "amount": "NaN/Corrupt" if _pd.isna(m_row["amount"]) else float(m_row["amount"]),
+                    "order_date": str(m_row["order_date"]),
+                },
+                "razorpay_data": {
+                    "payment_id": rz_row["payment_id"],
+                    "amount": "NaN/Corrupt" if _pd.isna(rz_row["amount"]) else float(rz_row["amount"]),
+                    "fee": "NaN/Corrupt" if _pd.isna(rz_row["fee"]) else float(rz_row["fee"]),
+                    "net_amount": "NaN/Corrupt" if _pd.isna(rz_row["net_amount"]) else float(rz_row["net_amount"]),
+                },
+                "note": "Corrupt or non-numeric data detected (NaN values). Cannot safely process.",
+            })
+            matched_merchant_ids.add(order_id)
+            matched_razorpay_ids.add(rz_row["payment_id"])
+            continue
+
         # Amount check
         amount_match = abs(float(m_row["amount"]) - float(rz_row["amount"])) < config.amount_tolerance
 

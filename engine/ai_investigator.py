@@ -52,14 +52,18 @@ def _init_client_pool():
         pass
 
 
+import threading
+_gemini_lock = threading.Lock()
+
 def _get_next_client():
     """Get next Gemini client from pool (round-robin). Draws ONCE per call."""
     global _client_index
     _init_client_pool()
     if not _client_pool:
         return None
-    client = _client_pool[_client_index % len(_client_pool)]
-    _client_index += 1
+    with _gemini_lock:
+        client = _client_pool[_client_index % len(_client_pool)]
+        _client_index += 1
     return client
 
 
@@ -277,7 +281,13 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
                             
                         parsed = json.loads(text)
                         if isinstance(parsed, dict):
-                            parsed = next(iter(parsed.values()))
+                            # Try to find a logical array key before falling back to the first value
+                            if "results" in parsed and isinstance(parsed["results"], list):
+                                parsed = parsed["results"]
+                            elif "anomalies" in parsed and isinstance(parsed["anomalies"], list):
+                                parsed = parsed["anomalies"]
+                            else:
+                                parsed = next(iter(parsed.values()))
                         
                         count = 0
                         for item in parsed:
@@ -335,9 +345,14 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
             with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
                 future_to_chunk = {executor.submit(process_chunk, chunk): chunk for chunk in chunks}
                 for future in concurrent.futures.as_completed(future_to_chunk):
-                    chunk_res, chunk_prov = future.result()
-                    ai_results_map.update(chunk_res)
-                    provider_map.update(chunk_prov)
+                    try:
+                        chunk_res, chunk_prov = future.result()
+                        ai_results_map.update(chunk_res)
+                        provider_map.update(chunk_prov)
+                    except Exception as e:
+                        logger.error(f"Worker thread exception during chunk processing: {e}")
+                        # If a chunk fails entirely, the anomalies in it will simply fallback 
+                        # to deterministic rules during the merge step below.
                     
                     completed_chunks += 1
                     if progress_callback:
@@ -390,10 +405,13 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
 
 def save_ai_cache(anomalies: list, cache_path: str):
     """Save enriched anomaly results to JSON for demo-day use."""
-    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    dname = os.path.dirname(cache_path)
+    if dname:
+        os.makedirs(dname, exist_ok=True)
     cacheable = [
         {
             "order_id": a.get("order_id"),
+            "anomaly_type": a.get("anomaly_type"),
             "ai_explanation": a.get("ai_explanation"),
             "ai_classification": a.get("ai_classification"),
             "ai_confidence": a.get("ai_confidence"),
@@ -415,12 +433,12 @@ def load_ai_cache(anomalies: list, cache_path: str) -> list:
         return anomalies
     try:
         with open(cache_path, encoding="utf-8") as f:
-            cached = {c["order_id"]: c for c in json.load(f)}
+            cached = {(c["order_id"], c.get("anomaly_type")): c for c in json.load(f)}
         merged = []
         for a in anomalies:
-            oid = a.get("order_id")
-            if oid in cached:
-                c = cached[oid]
+            key = (a.get("order_id"), a.get("anomaly_type"))
+            if key in cached:
+                c = cached[key]
                 # Backfill ai_provider if missing from older cache files
                 if "ai_provider" not in c:
                     c["ai_provider"] = "Cached result"

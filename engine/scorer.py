@@ -104,11 +104,14 @@ def score_results(
     # For anomalies where AI was invoked (or fallback classified), did it get the type right?
     ai_correct = 0
     ai_total = 0
+    ai_only_correct = 0
+    ai_only_total = 0
     ai_details = []
 
     for a in anomalies:
         oid = a.get("order_id", "")
         ai_class = a.get("ai_classification") or a.get("anomaly_type")
+        is_real_ai = a.get("ai_provider") and "deterministic" not in str(a.get("ai_provider")).lower()
         if not ai_class:
             continue
             
@@ -139,10 +142,15 @@ def score_results(
                     continue
 
             ai_total += 1
+            if is_real_ai:
+                ai_only_total += 1
+                
             normalized_ai = AI_TO_GROUND_TRUTH_MAP.get(ai_class, ai_class)
             is_correct = (normalized_ai == gt_type) or (ai_class == gt_type)
             if is_correct:
                 ai_correct += 1
+                if is_real_ai:
+                    ai_only_correct += 1
 
             ai_details.append({
                 "order_id": oid,
@@ -162,6 +170,9 @@ def score_results(
             continue  # Skip clean records that were wrongly flagged
 
         ai_total += 1
+        if is_real_ai:
+            ai_only_total += 1
+        
         # Normalize the AI classification (handle our internal name aliases)
         normalized_ai = AI_TO_GROUND_TRUTH_MAP.get(ai_class, ai_class)
 
@@ -169,6 +180,8 @@ def score_results(
         is_correct = (normalized_ai == gt_type) or (ai_class == gt_type)
         if is_correct:
             ai_correct += 1
+            if is_real_ai:
+                ai_only_correct += 1
 
         ai_details.append({
             "order_id": oid,
@@ -179,6 +192,7 @@ def score_results(
         })
 
     ai_accuracy = round(ai_correct / ai_total * 100, 1) if ai_total > 0 else 0.0
+    ai_only_accuracy = round(ai_only_correct / ai_only_total * 100, 1) if ai_only_total > 0 else 0.0
 
     # ─── Confusion matrix (simplified) ────────────────────────────────────
     confusion = {}
@@ -203,6 +217,9 @@ def score_results(
         "ai_accuracy": ai_accuracy,
         "ai_correct": ai_correct,
         "ai_total": ai_total,
+        "ai_only_accuracy": ai_only_accuracy,
+        "ai_only_correct": ai_only_correct,
+        "ai_only_total": ai_only_total,
         "ai_details": ai_details,
         "confusion_matrix": confusion,
         "undetected_anomalies": undetected,

@@ -158,7 +158,7 @@ def run_reconciliation(
                 "note": "Bank deposit could not be matched to any combination of settlements.",
             })
 
-    # Add successful split settlement matches as anomalies (they are matched financially, but are still exceptions)
+    # Add successful Phase 3 matches as anomalies (they are matched financially, but are still exceptions to the 1:1 rule)
     for match in p3_matches:
         if match.get("type") == "split_settlement_match":
             all_anomalies.append({
@@ -171,6 +171,17 @@ def run_reconciliation(
                 },
                 "note": match.get("note", "Split settlement resolved via Phase 3"),
             })
+        elif match.get("type") == "subset_match":
+            all_anomalies.append({
+                "order_id": f"BANK_{match.get('bank_utr', 'unknown')}",
+                "anomaly_type": "MERGED_SETTLEMENT",
+                "detected_in_phase": "Phase 3: Fuzzy/Subset-Sum Matching",
+                "bank_data": {
+                    "utr_number": match.get("bank_utr"),
+                    "matched_settlements": match.get("matched_settlements", []),
+                },
+                "note": match.get("note", "Merged settlement resolved via Phase 3"),
+            })
 
     # Investigate with AI
     enriched_anomalies = investigate_batch(all_anomalies, use_ai=use_ai)
@@ -180,6 +191,7 @@ def run_reconciliation(
         "input_count": len(all_anomalies),
         "anomaly_count": len(all_anomalies),
         "explained_count": sum(1 for a in enriched_anomalies if a.get("ai_suggested_resolution")),
+        "ai_explained_count": sum(1 for a in enriched_anomalies if a.get("ai_provider") and "deterministic" not in str(a.get("ai_provider")).lower()),
         "remaining_count": sum(1 for a in enriched_anomalies if a.get("needs_manual_review", True)),
     }
 
