@@ -14,7 +14,7 @@
     <img src="https://img.shields.io/badge/Streamlit-1.40+-FF4B4B.svg" alt="Streamlit">
     <img src="https://img.shields.io/badge/AI%20Stack-Groq%20%7C%20NVIDIA%20NIM%20%7C%20Gemini-green.svg" alt="AI Stack">
     <img src="https://img.shields.io/badge/Detection%20Accuracy-99.9%25-brightgreen.svg" alt="Detection Accuracy">
-    <img src="https://img.shields.io/badge/AI%20Diagnosis%20Accuracy-100.0%25-success.svg" alt="AI Accuracy">
+    <img src="https://img.shields.io/badge/AI%20Diagnosis%20Accuracy-96.0%25-success.svg" alt="AI Accuracy">
     <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
   </p>
 
@@ -131,7 +131,7 @@ Edge cases that pass through the deterministic filters undergo automated root-ca
   - **Dedicated Mismatch Table**: Isolates failing records with Expected Ground Truth, Actual AI Classification, Provider attribution, and detection notes.
   - **Interactive 3-Way Filter**: Toggle between `All Records`, `❌ Only Mismatches`, and `✅ Only Matches`.
   - **1-Click CSV Export**: Instant download of discrepancies for forensic auditing.
-- **AI Diagnosis Accuracy**: Compares LLM root-cause assignments against true underlying fault injections, achieving **100.0% AI accuracy**.
+- **AI Diagnosis Accuracy**: Compares LLM root-cause assignments against true underlying fault injections, achieving **96.0% AI accuracy** across injected benchmarks.
 - **Confusion Matrix Generation**: Surfaces exact classification distribution across all anomaly types (`TIMING_MISMATCH`, `SPLIT_SETTLEMENT`, `PARTIAL_REFUND`, `DUPLICATE_PAYMENT`, `FEE_DISCREPANCY`, `AMOUNT_DISCREPANCY`, `MISSING_RECORD`).
 
 ---
