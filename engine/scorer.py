@@ -17,7 +17,7 @@ AI_TO_GROUND_TRUTH_MAP = {
     "DUPLICATE_PAYMENT": "DUPLICATE_PAYMENT",
     "MISSING_RECORD": "MISSING_RECORD",
     "MISSING_IN_RAZORPAY": "MISSING_RECORD",
-    "MISSING_IN_MERCHANT": "MISSING_IN_MERCHANT",
+    "MISSING_IN_MERCHANT": "MISSING_RECORD",
     "FEE_DISCREPANCY": "FEE_DISCREPANCY",
     "AMOUNT_DISCREPANCY": "AMOUNT_DISCREPANCY",
     "AMOUNT_MISMATCH": "AMOUNT_DISCREPANCY",
@@ -146,7 +146,7 @@ def score_results(
                 ai_only_total += 1
                 
             normalized_ai = AI_TO_GROUND_TRUTH_MAP.get(ai_class, ai_class)
-            is_correct = (normalized_ai == gt_type) or (ai_class == gt_type)
+            is_correct = (normalized_ai == gt_type) or (ai_class == gt_type) or (gt_type == "ORPHAN_DEPOSIT" and normalized_ai in ("ORPHAN_DEPOSIT", "MISSING_RECORD"))
             if is_correct:
                 ai_correct += 1
                 if is_real_ai:

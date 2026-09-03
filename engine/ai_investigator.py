@@ -80,7 +80,7 @@ For EACH anomaly in the input array, respond with a JSON array of objects in the
 each shaped like:
 {
     "index": <int matching input index>,
-    "root_cause": "One of: TIMING_MISMATCH, PARTIAL_REFUND, FEE_DISCREPANCY, AMOUNT_DISCREPANCY, SPLIT_SETTLEMENT, DUPLICATE_PAYMENT, MISSING_RECORD, REQUIRES_MANUAL_REVIEW",
+    "root_cause": "One of: TIMING_MISMATCH, PARTIAL_REFUND, FEE_DISCREPANCY, AMOUNT_DISCREPANCY, SPLIT_SETTLEMENT, DUPLICATE_PAYMENT, MISSING_RECORD, ORPHAN_DEPOSIT, REQUIRES_MANUAL_REVIEW",
     "confidence": "One of: high, medium, low",
     "explanation": "Clear human-readable explanation. Reference specific dates, amounts, and IDs.",
     "suggested_resolution": "What action should be taken to resolve this",
@@ -507,8 +507,8 @@ def _fallback_classification(anomaly: dict) -> dict:
         },
         "ORPHAN_DEPOSIT": {
             "ai_explanation": "A bank deposit was received that cannot be matched to any Razorpay settlement. This may be part of a split settlement or a deposit from a different payment channel.",
-            "ai_classification": "MISSING_RECORD",
-            "ai_confidence": "low",
+            "ai_classification": "ORPHAN_DEPOSIT",
+            "ai_confidence": "medium",
             "ai_suggested_resolution": "Cross-reference the bank narration with Razorpay settlement IDs and check adjacent-date settlements.",
             "needs_manual_review": True,
         },
