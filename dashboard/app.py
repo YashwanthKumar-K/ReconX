@@ -761,10 +761,11 @@ if st.session_state.report is not None:
                 st.plotly_chart(fig_ai, width='stretch')
                 st.write(f"Correctly diagnosed: **{scores.get('ai_correct', 0)}/{scores.get('ai_total', 0)}** anomalies")
 
-            mismatches = scores.get("mismatches", [])
-            total_eval = len(scores.get("ai_details", []))
+            details = scores.get("ai_details", [])
+            mismatches = [d for d in details if not d.get("correct", False)]
+            total_eval = len(details)
             num_mismatches = len(mismatches)
-            num_correct = scores.get("ai_correct", 0)
+            num_correct = total_eval - num_mismatches
 
             st.markdown("---")
             st.markdown("### 🎯 Ground Truth Discrepancy & Mismatch Inspector")

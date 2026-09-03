@@ -87,10 +87,17 @@ each shaped like:
     "needs_manual_review": true or false
 }
 
+CRITICAL RULES FOR ROOT CAUSE:
+1. PARTIAL_REFUND: When merchant_amount equals razorpay_amount, fee is standard 2% MDR, and tax is standard 18% GST, but net_amount is less than expected (amount - fee - tax), a customer refund was deducted. Root cause MUST be PARTIAL_REFUND. NEVER label this as FEE_DISCREPANCY.
+2. FEE_DISCREPANCY: ONLY when the fee rate itself differs from 2% or tax differs from 18% of fee. If fee and tax calculations are normal, it is NEVER a FEE_DISCREPANCY.
+3. TIMING_MISMATCH: When payment occurred late at night (23:58-23:59) shifting settlement to next cutoff.
+4. DUPLICATE_PAYMENT: When multiple payments exist for the same order ID.
+5. MISSING_RECORD: When order is recorded by merchant but missing from Razorpay.
+6. AMOUNT_DISCREPANCY: When gross merchant_amount differs from gross razorpay_amount.
+
 IMPORTANT:
 - Use Rs. prefix for amounts (not rupee symbol)
 - Reference specific dates and IDs from the context
-- Common causes: midnight cutoff timing, partial refunds, split settlements, network delays, fee-rate changes
 - Respond ONLY with a valid JSON array, no extra text, no markdown fences
 """
 
@@ -369,10 +376,17 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
         for j, a in enumerate(to_investigate):
             r = ai_results_map.get(j, {})
             if r:
+                ai_class = r.get("root_cause", "REQUIRES_MANUAL_REVIEW")
+                # Financial consistency safeguard:
+                # If Phase 1 deterministic arithmetic already proved that MDR fee (2%) and GST (18%) are standard,
+                # but net amount is reduced, this is mathematically a PARTIAL_REFUND, not a FEE_DISCREPANCY.
+                if a.get("anomaly_type") == "PARTIAL_REFUND" and ai_class == "FEE_DISCREPANCY":
+                    ai_class = "PARTIAL_REFUND"
+
                 enriched = {
                     **a,
                     "ai_explanation": r.get("explanation", "No explanation provided."),
-                    "ai_classification": r.get("root_cause", "REQUIRES_MANUAL_REVIEW"),
+                    "ai_classification": ai_class,
                     "ai_confidence": r.get("confidence", "low"),
                     "ai_suggested_resolution": r.get("suggested_resolution", "Manual review recommended."),
                     "needs_manual_review": r.get("needs_manual_review", True),
@@ -438,10 +452,12 @@ def load_ai_cache(anomalies: list, cache_path: str) -> list:
         for a in anomalies:
             key = (a.get("order_id"), a.get("anomaly_type"))
             if key in cached:
-                c = cached[key]
+                c = dict(cached[key])
                 # Backfill ai_provider if missing from older cache files
                 if "ai_provider" not in c:
                     c["ai_provider"] = "Cached result"
+                if a.get("anomaly_type") == "PARTIAL_REFUND" and c.get("ai_classification") == "FEE_DISCREPANCY":
+                    c["ai_classification"] = "PARTIAL_REFUND"
                 merged.append({**a, **c})
             else:
                 merged.append({**a, **_fallback_classification(a), "ai_provider": "Rule-based (deterministic)"})
