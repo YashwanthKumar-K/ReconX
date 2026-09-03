@@ -13,3 +13,7 @@ data/uploaded/
 
 # AI result caches — stale demo risk
 data/*/cached_ai_results.json
+
+# Local IDE / AI-tooling metadata (broken symlinks, machine-specific)
+.agents/
+.claude/
