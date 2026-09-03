@@ -116,7 +116,7 @@ Edge cases that pass through the deterministic filters undergo automated root-ca
 - **Payload Token Compacting**: Batches anomalies into compacted JSON chunks (15 items/chunk) stripped of bulky redundant metadata, staying well within Groq TPM limits.
 - **Resilient AI Waterfall**:
   1. **Groq (`openai/gpt-oss-120b`)**: Ultra-high throughput 120B reasoning model with sub-second latency.
-  2. **NVIDIA NIM (`meta/llama-3.1-70b-instruct`)**: Secondary failover.
+  2. **NVIDIA NIM (`meta/llama-3.2-11b-vision-instruct`)**: Secondary failover.
   3. **Google Gemini (`Gemini Flash`)**: Cloud tertiary fallback via Google GenAI SDK.
   4. **Deterministic Rule Engine**: Final offline fallback ensuring 100% operational uptime even under total network disconnection.
 

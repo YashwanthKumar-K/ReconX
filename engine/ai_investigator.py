@@ -178,8 +178,8 @@ def _call_nvidia(prompt: str) -> Optional[str]:
                 "Content-Type": "application/json",
             }
             payload = {
-                # NVIDIA's free Llama 3.1 70B endpoint
-                "model": "meta/llama-3.1-70b-instruct",
+                # NVIDIA NIM active Llama 3.2 endpoint
+                "model": "meta/llama-3.2-11b-vision-instruct",
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": prompt},
@@ -314,7 +314,7 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
                 # 2. NVIDIA NIM
                 if len(results) < len(chunk):
                     raw_nvidia = _call_nvidia(chunk_prompt)
-                    if raw_nvidia and parse_and_map(raw_nvidia, "NVIDIA (Llama 3.1 70B)"):
+                    if raw_nvidia and parse_and_map(raw_nvidia, "NVIDIA (Llama 3.2 11B)"):
                         return results, providers
                 
                 # 3. Gemini

@@ -161,7 +161,7 @@ with st.sidebar:
     st.markdown(
         """
         - **Primary:** Groq (`GPT-OSS 120B`)
-        - **Secondary:** NVIDIA NIM (`Llama 3.1 70B`)
+        - **Secondary:** NVIDIA NIM (`Llama 3.2 11B`)
         - **Tertiary:** Google GenAI (`Gemini Flash`)
         - **Fallback:** Deterministic Rule Classifier
         """
