@@ -1,4 +1,4 @@
-﻿[build-system]
+[build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
@@ -13,7 +13,6 @@ authors = [
 ]
 dependencies = [
     "pandas>=2.0.0",
-    "networkx>=3.0",
     "streamlit>=1.30.0",
     "plotly>=5.18.0",
     "google-genai>=1.0.0",
@@ -21,5 +20,19 @@ dependencies = [
     "pydantic>=2.0.0",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+]
+
 [project.scripts]
 reconx = "engine.reconciliation_engine:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["engine*", "dashboard*"]
+exclude = ["data*", "tests*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

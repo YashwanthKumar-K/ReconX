@@ -12,7 +12,7 @@ Anomalies are batched into a single API call to conserve daily quota.
 import os
 import json
 import logging
-from typing import Optional
+from typing import Optional, Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -31,29 +31,34 @@ def _get_secret(key: str, default: str = "") -> str:
 
 # ─── Gemini Client Pool ───────────────────────────────────────────────────────
 
+import threading
+
 _client_pool = []
 _client_index = 0
+_pool_init_lock = threading.Lock()
+_gemini_lock = threading.Lock()
 
 
-def _init_client_pool():
-    """Initialize pool of Gemini clients from comma-separated API keys."""
+def _init_client_pool() -> None:
+    """Initialize pool of Gemini clients from comma-separated API keys with double-checked locking."""
     global _client_pool
     if _client_pool:
         return
-    try:
-        from google import genai
-        raw_keys = _get_secret("GEMINI_API_KEY")
-        if not raw_keys or raw_keys.strip() == "your_gemini_api_key_here":
+
+    with _pool_init_lock:
+        if _client_pool:  # Double-check inside lock
             return
-        keys = [k.strip() for k in raw_keys.split(",") if k.strip()]
-        for key in keys:
-            _client_pool.append(genai.Client(api_key=key))
-    except ImportError:
-        pass
+        try:
+            from google import genai
+            raw_keys = _get_secret("GEMINI_API_KEY")
+            if not raw_keys or raw_keys.strip() == "your_gemini_api_key_here":
+                return
+            keys = [k.strip() for k in raw_keys.split(",") if k.strip()]
+            for key in keys:
+                _client_pool.append(genai.Client(api_key=key))
+        except ImportError:
+            pass
 
-
-import threading
-_gemini_lock = threading.Lock()
 
 def _get_next_client():
     """Get next Gemini client from pool (round-robin). Draws ONCE per call."""
@@ -208,8 +213,12 @@ def _call_nvidia(prompt: str) -> Optional[str]:
 
 # ─── Batch Investigation (Fix 1 + Fix 4) ─────────────────────────────────────
 
-def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] = None,
-                      progress_callback=None, use_ai: bool = True) -> list:
+def investigate_batch(
+    anomalies: list[dict[str, Any]],
+    nearby_transactions_map: Optional[dict[str, Any]] = None,
+    progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    use_ai: bool = True,
+) -> list[dict[str, Any]]:
     """
     Investigate ALL anomalies in a SINGLE API call (batch prompt).
 
@@ -417,8 +426,8 @@ def investigate_batch(anomalies: list, nearby_transactions_map: Optional[dict] =
 
 # ─── Cache Helpers (Fix 2) ────────────────────────────────────────────────────
 
-def save_ai_cache(anomalies: list, cache_path: str):
-    """Save enriched anomaly results to JSON for demo-day use."""
+def save_ai_cache(anomalies: list[dict[str, Any]], cache_path: str) -> None:
+    """Save enriched anomaly results to JSON for caching."""
     dname = os.path.dirname(cache_path)
     if dname:
         os.makedirs(dname, exist_ok=True)
@@ -441,7 +450,7 @@ def save_ai_cache(anomalies: list, cache_path: str):
     logger.info(f"Saved {len(cacheable)} AI results to cache: {cache_path}")
 
 
-def load_ai_cache(anomalies: list, cache_path: str) -> list:
+def load_ai_cache(anomalies: list[dict[str, Any]], cache_path: str) -> list[dict[str, Any]]:
     """Load cached AI results and merge into anomaly dicts."""
     if not os.path.exists(cache_path):
         return anomalies

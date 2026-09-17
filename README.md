@@ -1,7 +1,7 @@
 <div align="center">
   <h1>ReconX</h1>
   <p><b>Automated Multi-Way Ledger Reconciliation & AI Anomaly Resolution Engine</b></p>
-  <p><i>Architected by <b>K Yashwanth Kumar</b> for the Razorpay AI Buildathon — Track 04: AI Finance Controller</i></p>
+  <p><i>Architected by <b>K Yashwanth Kumar</b> — Enterprise AI Financial Controller</i></p>
 
   <p>
     <a href="https://reconxcontroller.streamlit.app/">
@@ -339,14 +339,23 @@ streamlit run dashboard/app.py
 
 ---
 
-### Method D: Install as a Python CLI Tool
-You can install ReconX directly as a system command:
+### Method D: Install as a Python CLI Tool & Developer Setup
+You can install ReconX directly into your environment as an editable package and system command:
 ```bash
-pip install .
+# Install in development mode with test suite
+pip install -e ".[test]"
 
-# Run reconciliation on any folder directly from your terminal:
+# Run full reconciliation on sample data:
 reconx data/sample
+
+# Run ultra-fast deterministic-only reconciliation (no external LLM calls):
+reconx data/sample --no-ai
+
+# Run against large generated or benchmark datasets:
 reconx data/generated_8000 --no-ai
+
+# Run test suite:
+pytest tests/ -v
 ```
 
 ---
@@ -354,8 +363,8 @@ reconx data/generated_8000 --no-ai
 ## 🧑‍💻 Author & Acknowledgments
 
 - **Architect & Lead Developer:** [K Yashwanth Kumar](https://github.com/YashwanthKumar-K)
-- **Competition:** Razorpay AI Buildathon 2026
-- **Track:** Track 04 — AI Finance Controller
+- **Role:** Enterprise AI Financial Controller & Systems Architecture
+- **License:** MIT License
 
 <div align="center">
   <p><i>"Reconciliation shouldn't be a forensic investigation. Automate the arithmetic, empower the controller."</i></p>

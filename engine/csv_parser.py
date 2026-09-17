@@ -12,7 +12,7 @@ class CSVValidationError(Exception):
     """Raised when an uploaded CSV is missing required columns."""
     pass
 
-def validate_columns(df: pd.DataFrame, required: list, filename: str):
+def validate_columns(df: pd.DataFrame, required: list[str], filename: str) -> None:
     missing = [c for c in required if c not in df.columns]
     if missing:
         raise CSVValidationError(f"'{filename}' is missing required columns: {', '.join(missing)}")
@@ -62,18 +62,18 @@ def parse_ground_truth(path: str) -> pd.DataFrame:
     return df
 
 
-def load_all_data(data_dir: str) -> dict:
+def load_all_data(data_dir: str) -> dict[str, Optional[pd.DataFrame]]:
     """
     Load CSVs from a directory. ground_truth.csv is optional.
 
     Returns:
         Dict with keys: merchant, razorpay, bank, ground_truth (None if missing).
     """
-    data_dir = Path(data_dir)
-    gt_path = data_dir / "ground_truth.csv"
+    path_obj = Path(data_dir)
+    gt_path = path_obj / "ground_truth.csv"
     return {
-        "merchant": parse_merchant_orders(str(data_dir / "merchant_orders.csv")),
-        "razorpay": parse_razorpay_transactions(str(data_dir / "razorpay_transactions.csv")),
-        "bank": parse_bank_statement(str(data_dir / "bank_statement.csv")),
+        "merchant": parse_merchant_orders(str(path_obj / "merchant_orders.csv")),
+        "razorpay": parse_razorpay_transactions(str(path_obj / "razorpay_transactions.csv")),
+        "bank": parse_bank_statement(str(path_obj / "bank_statement.csv")),
         "ground_truth": parse_ground_truth(str(gt_path)) if gt_path.exists() else None,
     }

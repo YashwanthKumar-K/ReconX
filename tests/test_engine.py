@@ -1,0 +1,270 @@
+"""
+Unit tests for ReconX engine components:
+- direct_matcher (Phase 1)
+- settlement_matcher (Phase 2)
+- graph_matcher (Phase 3)
+- scorer (Phase 5)
+- csv_parser
+"""
+import pytest
+import pandas as pd
+
+from engine.direct_matcher import run_phase1
+from engine.settlement_matcher import run_phase2
+from engine.graph_matcher import run_phase3
+from engine.scorer import score_results
+from engine.csv_parser import validate_columns, CSVValidationError
+
+
+# ─── Direct Matcher Tests (Phase 1) ──────────────────────────────────────────
+
+def test_phase1_clean_match():
+    merchant_df = pd.DataFrame([{
+        "order_id": "ORD_001",
+        "amount": 1000.0,
+        "order_date": "2026-08-20 10:00:00",
+        "status": "completed",
+    }])
+    razorpay_df = pd.DataFrame([{
+        "order_id": "ORD_001",
+        "payment_id": "pay_001",
+        "settlement_id": "setl_001",
+        "amount": 1000.0,
+        "fee": 20.0,
+        "tax": 3.6,
+        "net_amount": 976.4,
+        "payment_date": "2026-08-20 10:01:00",
+        "settlement_date": "2026-08-21",
+        "status": "captured",
+    }])
+
+    matched, anomalies, _, _ = run_phase1(merchant_df, razorpay_df)
+    assert len(matched) == 1
+    assert len(anomalies) == 0
+    assert matched[0]["order_id"] == "ORD_001"
+
+
+def test_phase1_missing_in_razorpay():
+    merchant_df = pd.DataFrame([{
+        "order_id": "ORD_MISSING",
+        "amount": 500.0,
+        "order_date": "2026-08-20 10:00:00",
+        "status": "completed",
+    }])
+    razorpay_df = pd.DataFrame(columns=[
+        "order_id", "payment_id", "settlement_id", "amount", "fee", "tax", "net_amount", "payment_date", "settlement_date", "status"
+    ])
+
+    matched, anomalies, _, _ = run_phase1(merchant_df, razorpay_df)
+    assert len(matched) == 0
+    assert len(anomalies) == 1
+    assert anomalies[0]["anomaly_type"] == "MISSING_RECORD"
+
+
+def test_phase1_duplicate_payment():
+    merchant_df = pd.DataFrame([{
+        "order_id": "ORD_DUP",
+        "amount": 1000.0,
+        "order_date": "2026-08-20 10:00:00",
+        "status": "completed",
+    }])
+    razorpay_df = pd.DataFrame([
+        {
+            "order_id": "ORD_DUP",
+            "payment_id": "pay_DUP_1",
+            "settlement_id": "setl_001",
+            "amount": 1000.0,
+            "fee": 20.0,
+            "tax": 3.6,
+            "net_amount": 976.4,
+            "payment_date": "2026-08-20 10:01:00",
+            "settlement_date": "2026-08-21",
+            "status": "captured",
+        },
+        {
+            "order_id": "ORD_DUP",
+            "payment_id": "pay_DUP_2",
+            "settlement_id": "setl_001",
+            "amount": 1000.0,
+            "fee": 20.0,
+            "tax": 3.6,
+            "net_amount": 976.4,
+            "payment_date": "2026-08-20 10:02:00",
+            "settlement_date": "2026-08-21",
+            "status": "captured",
+        },
+    ])
+
+    matched, anomalies, _, _ = run_phase1(merchant_df, razorpay_df)
+    assert len(anomalies) == 1
+    assert anomalies[0]["anomaly_type"] == "DUPLICATE_PAYMENT"
+
+
+def test_phase1_fee_and_tax_discrepancies():
+    # Test abnormal fee rate
+    merchant_df = pd.DataFrame([{
+        "order_id": "ORD_FEE",
+        "amount": 1000.0,
+        "order_date": "2026-08-20 10:00:00",
+        "status": "completed",
+    }])
+    razorpay_df_bad_fee = pd.DataFrame([{
+        "order_id": "ORD_FEE",
+        "payment_id": "pay_FEE",
+        "settlement_id": "setl_001",
+        "amount": 1000.0,
+        "fee": 50.0,  # 5% instead of 2%
+        "tax": 9.0,
+        "net_amount": 941.0,
+        "payment_date": "2026-08-20 10:01:00",
+        "settlement_date": "2026-08-21",
+        "status": "captured",
+    }])
+    _, anomalies_fee, _, _ = run_phase1(merchant_df, razorpay_df_bad_fee)
+    assert len(anomalies_fee) == 1
+    assert anomalies_fee[0]["anomaly_type"] == "FEE_DISCREPANCY"
+
+    # Test abnormal GST tax
+    razorpay_df_bad_tax = pd.DataFrame([{
+        "order_id": "ORD_FEE",
+        "payment_id": "pay_FEE",
+        "settlement_id": "setl_001",
+        "amount": 1000.0,
+        "fee": 20.0,  # standard 2%
+        "tax": 15.0,  # should be 3.6
+        "net_amount": 965.0,
+        "payment_date": "2026-08-20 10:01:00",
+        "settlement_date": "2026-08-21",
+        "status": "captured",
+    }])
+    _, anomalies_tax, _, _ = run_phase1(merchant_df, razorpay_df_bad_tax)
+    assert len(anomalies_tax) == 1
+    assert anomalies_tax[0]["anomaly_type"] == "FEE_DISCREPANCY"
+
+
+def test_phase1_partial_refund():
+    merchant_df = pd.DataFrame([{
+        "order_id": "ORD_REFUND",
+        "amount": 1000.0,
+        "order_date": "2026-08-20 10:00:00",
+        "status": "completed",
+    }])
+    # Normal fee (20) & tax (3.60), but net is reduced by 200 (refund)
+    razorpay_df = pd.DataFrame([{
+        "order_id": "ORD_REFUND",
+        "payment_id": "pay_REFUND",
+        "settlement_id": "setl_001",
+        "amount": 1000.0,
+        "fee": 20.0,
+        "tax": 3.6,
+        "net_amount": 776.4,  # Expected was 976.4
+        "payment_date": "2026-08-20 10:01:00",
+        "settlement_date": "2026-08-21",
+        "status": "captured",
+    }])
+    _, anomalies, _, _ = run_phase1(merchant_df, razorpay_df)
+    assert len(anomalies) == 1
+    assert anomalies[0]["anomaly_type"] == "PARTIAL_REFUND"
+
+
+# ─── Settlement Matcher Tests (Phase 2) ──────────────────────────────────────
+
+def test_phase2_batch_match():
+    razorpay_df = pd.DataFrame([
+        {
+            "order_id": "ORD_01",
+            "payment_id": "pay_01",
+            "settlement_id": "setl_100",
+            "amount": 1000.0,
+            "net_amount": 976.4,
+            "settlement_date": "2026-08-21",
+        },
+        {
+            "order_id": "ORD_02",
+            "payment_id": "pay_02",
+            "settlement_id": "setl_100",
+            "amount": 2000.0,
+            "net_amount": 1952.8,
+            "settlement_date": "2026-08-21",
+        },
+    ])
+    total_net = 976.4 + 1952.8  # 2929.20
+    bank_df = pd.DataFrame([{
+        "utr_number": "UTR_TEST_100",
+        "deposit_amount": total_net,
+        "deposit_date": "2026-08-21",
+        "description": "RAZORPAY SETTLEMENT setl_100",
+    }])
+
+    p2_matches, p2_anomalies, unmatched_bank = run_phase2(razorpay_df, bank_df, [])
+    assert len(p2_matches) == 1
+    assert p2_matches[0]["settlement_id"] == "setl_100"
+    assert p2_matches[0]["utr_number"] == "UTR_TEST_100"
+    assert len(unmatched_bank) == 0
+
+
+# ─── Graph Matcher Tests (Phase 3: Bounded Subset-Sum) ───────────────────────
+
+def test_phase3_subset_sum():
+    # 2 razorpay nets summing to 1 bank deposit
+    unmatched_nets_multi = [
+        {"id": "setl_1", "settlement_id": "setl_1", "net_amount": 3000.0, "settlement_date": "2026-08-20"},
+        {"id": "setl_2", "settlement_id": "setl_2", "net_amount": 2000.0, "settlement_date": "2026-08-20"},
+    ]
+    unmatched_bank_single = [{
+        "utr_number": "UTR_COMBINED",
+        "deposit_amount": 5000.0,
+        "deposit_date": "2026-08-21",
+        "description": "BATCH DEPOSIT",
+    }]
+
+    matches, still_unmatched = run_phase3(unmatched_nets_multi, unmatched_bank_single)
+    assert len(matches) == 1
+    assert matches[0]["matched_total"] == 5000.0
+    assert matches[0]["bank_utr"] == "UTR_COMBINED"
+    assert len(matches[0]["matched_settlements"]) == 2
+
+
+# ─── Scorer Tests (Phase 5) ──────────────────────────────────────────────────
+
+def test_scorer_accuracy():
+    anomalies = [
+        {
+            "order_id": "ORD_1",
+            "anomaly_type": "TIMING_MISMATCH",
+            "ai_classification": "TIMING_MISMATCH",
+            "ai_confidence": "high",
+        },
+        {
+            "order_id": "ORD_2",
+            "anomaly_type": "PARTIAL_REFUND",
+            "ai_classification": "PARTIAL_REFUND",
+            "ai_confidence": "high",
+        },
+        {
+            "order_id": "ORD_3",
+            "anomaly_type": "FEE_DISCREPANCY",
+            "ai_classification": "FEE_DISCREPANCY",
+            "ai_confidence": "high",
+        },
+    ]
+    ground_truth = pd.DataFrame([
+        {"order_id": "ORD_1", "injected_anomaly_type": "TIMING_MISMATCH"},
+        {"order_id": "ORD_2", "injected_anomaly_type": "PARTIAL_REFUND"},
+        {"order_id": "ORD_3", "injected_anomaly_type": "FEE_DISCREPANCY"},
+        {"order_id": "ORD_CLEAN", "injected_anomaly_type": "NONE"},
+    ])
+    matched_ids = {"ORD_CLEAN"}
+
+    scores = score_results(anomalies, ground_truth, matched_ids)
+    assert scores["engine_accuracy"] == 100.0
+    assert scores["ai_accuracy"] == 100.0
+    assert len(scores["mismatches"]) == 0
+
+
+# ─── CSV Parser Validation Tests ─────────────────────────────────────────────
+
+def test_csv_validation_missing_column():
+    bad_df = pd.DataFrame([{"wrong_col": 123}])
+    with pytest.raises(CSVValidationError):
+        validate_columns(bad_df, ["order_id", "amount"], "test.csv")

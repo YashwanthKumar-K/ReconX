@@ -1,6 +1,6 @@
-﻿# ==============================================================================
+# ==============================================================================
 # ReconX — Docker Container
-# Architect: K Yashwanth Kumar | Razorpay Buildathon 2026
+# Architect: K Yashwanth Kumar | ReconX Enterprise Engine
 # ==============================================================================
 FROM python:3.11-slim
 
@@ -26,6 +26,12 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy application code
 COPY . .
+
+# Create non-root user for security best practices
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
 
 # Expose standard Streamlit port
 EXPOSE 8501

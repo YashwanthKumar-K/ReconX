@@ -245,7 +245,7 @@ def run_reconciliation(
         "scores": scores,
         "elapsed_seconds": elapsed,
         "author": "K Yashwanth Kumar",
-        "track": "Razorpay Buildathon Track 04",
+        "category": "Enterprise Multi-Way Ledger Reconciliation",
     }
 
     if verbose:

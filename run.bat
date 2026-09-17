@@ -4,7 +4,7 @@ color 0B
 
 echo ===============================================================================
 echo                ReconX -- Automated Ledger Reconciliation Engine
-echo            Track 04: AI Finance Controller - Razorpay Buildathon
+echo            Enterprise Edition -- Autonomous AI Financial Controller
 echo ===============================================================================
 echo.
 

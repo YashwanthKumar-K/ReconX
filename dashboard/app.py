@@ -34,10 +34,10 @@ st.markdown("""
     /*
      * ReconX — Multi-Way Ledger Reconciliation & AI Anomaly Resolution Engine
      * Architect & Lead Developer: K Yashwanth Kumar
-     * Razorpay Buildathon 2026 — Track 04: AI Finance Controller
+     * Enterprise Edition — Autonomous Financial Controller
      */
     html::before {
-        content: "Architected by K Yashwanth Kumar | Razorpay Buildathon Track 04";
+        content: "Architected by K Yashwanth Kumar | ReconX Enterprise Engine";
         display: none !important;
         visibility: hidden !important;
     }
@@ -133,7 +133,7 @@ st.markdown("""
 # ─── Header ──────────────────────────────────────────────────────────────────
 
 st.markdown("""
-<div class="enterprise-header" data-author="K Yashwanth Kumar" data-architect="K Yashwanth Kumar" data-track="Razorpay Buildathon Track 04">
+<div class="enterprise-header" data-author="K Yashwanth Kumar" data-architect="K Yashwanth Kumar">
     <div style="display: flex; justify-content: space-between; align-items: baseline;">
         <div>
             <h1 class="brand-title">ReconX</h1>
@@ -141,7 +141,7 @@ st.markdown("""
         </div>
         <div style="text-align: right;">
             <span style="font-size: 0.78rem; color: #94a3b8; background: #141a26; padding: 4px 10px; border-radius: 4px; border: 1px solid #1f293d;">
-                Razorpay Buildathon · Track 04
+                Enterprise Edition
             </span>
         </div>
     </div>

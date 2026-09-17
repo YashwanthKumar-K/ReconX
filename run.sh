@@ -1,14 +1,14 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # ==============================================================================
 # ReconX — One-Click Launcher for macOS & Linux
-# Architect: K Yashwanth Kumar | Razorpay Buildathon
+# Architect: K Yashwanth Kumar
 # ==============================================================================
 
 set -e
 
 echo "==============================================================================="
 echo "               ReconX -- Automated Ledger Reconciliation Engine"
-echo "           Track 04: AI Finance Controller - Razorpay Buildathon"
+echo "           Enterprise Edition -- Autonomous AI Financial Controller"
 echo "==============================================================================="
 echo ""
 
