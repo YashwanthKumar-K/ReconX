@@ -94,10 +94,11 @@ flowchart TD
 - **Schema-Resilient Ingestion**: Employs defensive column resolution (`.get()`) to seamlessly handle optional merchant metadata (`product`, `customer_name`, custom ERP tags) without `KeyError` exceptions.
 
 ### 2. Phase 2 — Settlement Batch Aggregation & UTR Linking
-- **Batch Grouping**: Groups gateway transactions by `settlement_id`, computing the aggregate expected payout:
+- **Batch Grouping with Duplicate Exclusion**: Groups gateway transactions by `settlement_id`, excluding duplicate payments flagged in Phase 1 to prevent inflated batch sums, computing the aggregate expected payout:
   $$\text{Batch Expected Total} = \sum_{i \in \text{Batch}} \text{net\_amount}_i$$
-- **Regex Bank Extraction**: Parses unstructured bank transaction descriptions using strict pattern matching (`SETL_\w+`, `setl_\w+`) to link bank deposit records to Razorpay settlement batches.
-- **Tolerance-Aware Float Matching**: Applies calibrated tolerances ($\pm ₹0.05$) to account for IEEE-754 floating-point rounding across thousands of transactions.
+- **Exact-Token Regex Bank Extraction**: Parses unstructured bank transaction descriptions using exact-token boundary matching (`\bsetl_[a-zA-Z0-9]+\b`) to reliably link bank deposit records to Razorpay settlement batches without false substring matches.
+- **Finance-Grade Decimal Precision**: Employs Python `Decimal(ROUND_HALF_UP)` arithmetic with configurable tolerances ($\pm ₹1.00$ strict amount/date window, $\pm ₹5.00$ with 7-day date-gated narration match) to eliminate IEEE-754 binary floating-point accumulation drift.
+
 
 ### 3. Phase 3 — Bounded Combinatorial Subset-Sum Matching (Anti-NP-Hard)
 Resolving split bank deposits or multi-day merged settlement payouts is an NP-Hard problem:

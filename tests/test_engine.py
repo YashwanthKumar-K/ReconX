@@ -268,3 +268,93 @@ def test_csv_validation_missing_column():
     bad_df = pd.DataFrame([{"wrong_col": 123}])
     with pytest.raises(CSVValidationError):
         validate_columns(bad_df, ["order_id", "amount"], "test.csv")
+
+
+def test_csv_parser_indian_thousands_separator(tmp_path):
+    from engine.csv_parser import parse_merchant_orders, parse_bank_statement
+    csv_file = tmp_path / "merchant_orders.csv"
+    csv_file.write_text(
+        "order_id,amount,order_date,status\n"
+        "ORD_101,\"1,48,250.00\",2026-08-20,completed\n"
+        "ORD_102,\"₹2,499.50\",2026-08-20,completed\n",
+        encoding="utf-8"
+    )
+
+    df = parse_merchant_orders(str(csv_file))
+    assert df["amount"].iloc[0] == 148250.00
+    assert df["amount"].iloc[1] == 2499.50
+    assert not df["amount"].isna().any()
+
+
+def test_csv_parser_dayfirst_dates(tmp_path):
+    from engine.csv_parser import parse_merchant_orders
+    csv_file = tmp_path / "merchant_orders.csv"
+    # 03/04/2026 in Indian convention is 3rd April 2026 (day=3, month=4)
+    csv_file.write_text(
+        "order_id,amount,order_date,status\n"
+        "ORD_201,1000.0,03/04/2026,completed\n"
+    )
+    df = parse_merchant_orders(str(csv_file))
+    parsed_date = df["order_date"].iloc[0]
+    assert parsed_date.day == 3
+    assert parsed_date.month == 4
+
+
+def test_phase1_duplicate_merchant_order():
+    merchant_df = pd.DataFrame([
+        {"order_id": "ORD_DUP", "amount": 1000.0, "order_date": "2026-08-20", "status": "completed"},
+        {"order_id": "ORD_DUP", "amount": 1000.0, "order_date": "2026-08-20", "status": "completed"},
+    ])
+    razorpay_df = pd.DataFrame([
+        {
+            "order_id": "ORD_DUP",
+            "payment_id": "pay_dup",
+            "amount": 1000.0,
+            "fee": 20.0,
+            "tax": 3.6,
+            "net_amount": 976.4,
+            "settlement_id": "setl_dup",
+            "payment_date": "2026-08-20",
+            "settlement_date": "2026-08-21",
+            "status": "captured",
+        }
+    ])
+    _, anomalies, _, _ = run_phase1(merchant_df, razorpay_df)
+    dup_anomalies = [a for a in anomalies if a["anomaly_type"] == "DUPLICATE_MERCHANT_ORDER"]
+    assert len(dup_anomalies) == 1
+    assert dup_anomalies[0]["order_id"] == "ORD_DUP"
+
+
+def test_settlement_mismatch_fallback():
+    from engine.ai_investigator import _fallback_classification
+    anomaly = {"order_id": "SETTLEMENT_setl_test", "anomaly_type": "SETTLEMENT_MISMATCH"}
+    res = _fallback_classification(anomaly)
+    assert res["ai_classification"] == "SETTLEMENT_MISMATCH"
+    assert res["needs_manual_review"] is True
+
+
+def test_ai_cache_fingerprint_invalidation(tmp_path):
+    from engine.ai_investigator import save_ai_cache, load_ai_cache
+    cache_file = str(tmp_path / "test_cache.json")
+    original_anomalies = [{
+        "order_id": "ORD_CACHE",
+        "anomaly_type": "AMOUNT_MISMATCH",
+        "merchant_data": {"amount": 500.0},
+        "razorpay_data": {"amount": 600.0},
+        "ai_classification": "AMOUNT_DISCREPANCY",
+        "ai_explanation": "Original explanation for 500 vs 600",
+        "needs_manual_review": True,
+    }]
+    save_ai_cache(original_anomalies, cache_file)
+
+    # When transaction amounts change, old cached explanation should NOT be returned
+    changed_anomalies = [{
+        "order_id": "ORD_CACHE",
+        "anomaly_type": "AMOUNT_MISMATCH",
+        "merchant_data": {"amount": 700.0},  # Amount modified!
+        "razorpay_data": {"amount": 800.0},
+    }]
+    loaded = load_ai_cache(changed_anomalies, cache_file)
+    # Cache should miss and fall back to rule-based fallback instead of returning stale explanation
+    assert loaded[0]["ai_explanation"] != "Original explanation for 500 vs 600"
+

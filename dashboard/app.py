@@ -288,39 +288,55 @@ if sample_500_btn:
     st.session_state.data_size = 500
 
 if uploaded_files and len(uploaded_files) >= 3:
-    upload_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "uploaded")
-    os.makedirs(upload_dir, exist_ok=True)
+    import uuid
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = uuid.uuid4().hex[:10]
 
-    # 1. Clear only known CSV files — avoids WinError 5 from rmtree on locked dirs
-    for stale in ["merchant_orders.csv", "razorpay_transactions.csv",
-                   "bank_statement.csv", "ground_truth.csv", "cached_ai_results.json"]:
-        stale_path = os.path.join(upload_dir, stale)
-        try:
-            if os.path.exists(stale_path):
-                os.remove(stale_path)
-        except OSError:
-            pass  # File locked — overwrite below will still work
+    # Enforce maximum upload size limit (50 MB per file)
+    MAX_FILE_SIZE = 50 * 1024 * 1024
+    oversized = [f.name for f in uploaded_files if getattr(f, "size", 0) > MAX_FILE_SIZE]
+    if oversized:
+        st.error(f"The following file(s) exceed the 50MB size limit: {', '.join(oversized)}")
+    else:
+        # Isolated per-session upload directory avoids concurrent session collision
+        upload_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "data",
+            "uploaded",
+            st.session_state.session_id,
+        )
+        os.makedirs(upload_dir, exist_ok=True)
 
-    
-    # 2. Save files using strict whitelisted names
-    saved_count = 0
-    for f in uploaded_files:
-        name_lower = f.name.lower()
-        target_name = None
-        if "ground" in name_lower or "truth" in name_lower or "answer" in name_lower:
-            target_name = "ground_truth.csv"  # optional — enables accuracy scoring
-        elif "merchant" in name_lower or "order" in name_lower:
-            target_name = "merchant_orders.csv"
-        elif "razorpay" in name_lower or "transaction" in name_lower:
-            target_name = "razorpay_transactions.csv"
-        elif "bank" in name_lower or "statement" in name_lower:
-            target_name = "bank_statement.csv"
+        # 1. Clear only known CSV files in this session directory
+        for stale in ["merchant_orders.csv", "razorpay_transactions.csv",
+                       "bank_statement.csv", "ground_truth.csv", "cached_ai_results.json"]:
+            stale_path = os.path.join(upload_dir, stale)
+            try:
+                if os.path.exists(stale_path):
+                    os.remove(stale_path)
+            except OSError:
+                pass
 
-        if target_name:
-            with open(os.path.join(upload_dir, target_name), "wb") as out:
-                out.write(f.getbuffer())
-            if target_name != "ground_truth.csv":
-                saved_count += 1  # only count the 3 required ledger files
+        # 2. Save files using strict whitelisted names
+        saved_count = 0
+        for f in uploaded_files:
+            name_lower = f.name.lower()
+            target_name = None
+            if "ground" in name_lower or "truth" in name_lower or "answer" in name_lower:
+                target_name = "ground_truth.csv"  # optional — enables accuracy scoring
+            elif "merchant" in name_lower or "order" in name_lower:
+                target_name = "merchant_orders.csv"
+            elif "razorpay" in name_lower or "transaction" in name_lower:
+                target_name = "razorpay_transactions.csv"
+            elif "bank" in name_lower or "statement" in name_lower:
+                target_name = "bank_statement.csv"
+
+            if target_name:
+                with open(os.path.join(upload_dir, target_name), "wb") as out:
+                    out.write(f.getbuffer())
+                if target_name != "ground_truth.csv":
+                    saved_count += 1  # only count the 3 required ledger files
+
 
     if saved_count >= 3:
         data_dir = upload_dir

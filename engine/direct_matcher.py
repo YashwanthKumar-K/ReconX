@@ -51,12 +51,33 @@ def run_phase1(
 
     matched_merchant_ids = set()
     matched_razorpay_ids = set()
+    seen_merchant_order_ids = set()
 
     for _, m_row in merchant_df.iterrows():
         order_id = m_row["order_id"]
 
+        # Duplicate merchant order detection
+        if order_id in seen_merchant_order_ids:
+            anomalies.append({
+                "order_id": order_id,
+                "anomaly_type": "DUPLICATE_MERCHANT_ORDER",
+                "detected_in_phase": "Phase 1: Direct Key Matching",
+                "merchant_data": {
+                    "amount": float(_d(m_row["amount"])),
+                    "order_date": str(m_row["order_date"]),
+                    "status": m_row.get("status", ""),
+                    "product": m_row.get("product", ""),
+                    "customer_name": m_row.get("customer_name", ""),
+                },
+                "razorpay_data": None,
+                "note": f"Duplicate merchant order: order_id {order_id} appears more than once in merchant ledger.",
+            })
+            continue
+        seen_merchant_order_ids.add(order_id)
+
         if order_id not in rz_by_order:
             # Missing in Razorpay
+
             anomalies.append({
                 "order_id": order_id,
                 "anomaly_type": "MISSING_RECORD",

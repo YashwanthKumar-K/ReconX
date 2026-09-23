@@ -211,7 +211,38 @@ def _call_nvidia(prompt: str) -> Optional[str]:
     return None
 
 
+def _parse_bool(val: Any, default: bool = True) -> bool:
+    """Parse boolean safely from LLM output (e.g. 'false' string should be False)."""
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, str):
+        v = val.strip().lower()
+        if v in ("false", "0", "no", "off"):
+            return False
+        if v in ("true", "1", "yes", "on"):
+            return True
+    return default
+
+
+def _get_cache_fingerprint(a: dict[str, Any]) -> str:
+    """Multi-field fingerprint: includes amounts to invalidate stale cache if transaction data changes."""
+    oid = str(a.get("order_id", ""))
+    atype = str(a.get("anomaly_type", ""))
+    m_data = a.get("merchant_data") or {}
+    r_data = a.get("razorpay_data") or {}
+    b_data = a.get("bank_data") or {}
+    m_amt = str(m_data.get("amount", "")) if isinstance(m_data, dict) else ""
+    r_amt = ""
+    if isinstance(r_data, dict):
+        r_amt = str(r_data.get("amount", r_data.get("expected_total", "")))
+    elif isinstance(r_data, list) and r_data:
+        r_amt = str(r_data[0].get("amount", ""))
+    b_amt = str(b_data.get("deposit_amount", "")) if isinstance(b_data, dict) else ""
+    return f"{oid}|{atype}|{m_amt}|{r_amt}|{b_amt}"
+
+
 # ─── Batch Investigation (Fix 1 + Fix 4) ─────────────────────────────────────
+
 
 def investigate_batch(
     anomalies: list[dict[str, Any]],
@@ -398,7 +429,7 @@ def investigate_batch(
                     "ai_classification": ai_class,
                     "ai_confidence": r.get("confidence", "low"),
                     "ai_suggested_resolution": r.get("suggested_resolution", "Manual review recommended."),
-                    "needs_manual_review": r.get("needs_manual_review", True),
+                    "needs_manual_review": _parse_bool(r.get("needs_manual_review"), default=True),
                     "ai_provider": provider_map.get(j, "Groq (Llama 3 70B)"),
                 }
             else:
@@ -435,6 +466,7 @@ def save_ai_cache(anomalies: list[dict[str, Any]], cache_path: str) -> None:
         {
             "order_id": a.get("order_id"),
             "anomaly_type": a.get("anomaly_type"),
+            "fingerprint": _get_cache_fingerprint(a),
             "ai_explanation": a.get("ai_explanation"),
             "ai_classification": a.get("ai_classification"),
             "ai_confidence": a.get("ai_confidence"),
@@ -451,17 +483,28 @@ def save_ai_cache(anomalies: list[dict[str, Any]], cache_path: str) -> None:
 
 
 def load_ai_cache(anomalies: list[dict[str, Any]], cache_path: str) -> list[dict[str, Any]]:
-    """Load cached AI results and merge into anomaly dicts."""
+    """Load cached AI results and merge into anomaly dicts, validating fingerprint to prevent stale cache."""
     if not os.path.exists(cache_path):
         return anomalies
     try:
         with open(cache_path, encoding="utf-8") as f:
-            cached = {(c["order_id"], c.get("anomaly_type")): c for c in json.load(f)}
+            raw_cache = json.load(f)
+            # Index by fingerprint if present, else fallback to (order_id, anomaly_type)
+            cached_by_fp = {c.get("fingerprint"): c for c in raw_cache if c.get("fingerprint")}
+            cached_legacy = {(c["order_id"], c.get("anomaly_type")): c for c in raw_cache}
+
         merged = []
         for a in anomalies:
-            key = (a.get("order_id"), a.get("anomaly_type"))
-            if key in cached:
-                c = dict(cached[key])
+            fp = _get_cache_fingerprint(a)
+            leg_key = (a.get("order_id"), a.get("anomaly_type"))
+
+            c = None
+            if fp in cached_by_fp:
+                c = dict(cached_by_fp[fp])
+            elif leg_key in cached_legacy and not cached_by_fp:
+                c = dict(cached_legacy[leg_key])
+
+            if c is not None:
                 # Backfill ai_provider if missing from older cache files
                 if "ai_provider" not in c:
                     c["ai_provider"] = "Cached result"
@@ -525,7 +568,7 @@ def _fallback_classification(anomaly: dict) -> dict:
         },
         "SETTLEMENT_MISMATCH": {
             "ai_explanation": "A Razorpay settlement batch has no matching bank deposit, or the deposit amount does not match. The settlement may have been split, delayed, or an orphan deposit exists.",
-            "ai_classification": "SPLIT_SETTLEMENT",
+            "ai_classification": "SETTLEMENT_MISMATCH",
             "ai_confidence": "medium",
             "ai_suggested_resolution": "Check if bank deposits on adjacent dates sum to the settlement total.",
             "needs_manual_review": True,

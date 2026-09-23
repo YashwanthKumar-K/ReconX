@@ -11,10 +11,26 @@ from datetime import timedelta
 from itertools import combinations
 from typing import Tuple
 
+from engine.config import config
+
 MAX_SUBSET_SIZE = 3  # Realistic split payouts are at most 2-3 tranches
 DATE_WINDOW_DAYS = 2  # Only consider items within ±2 days
-AMOUNT_TOLERANCE = 2.0  # ₹2 tolerance for matching
-MAX_CANDIDATES = 15  # Prune to top 15 closest candidates to avoid combinatorial explosion
+MAX_CANDIDATES = 15  # Prune candidates to avoid combinatorial explosion
+
+
+def _prune_candidates(candidates: list[dict], target: float, amount_key: str, max_count: int) -> list[dict]:
+    """
+    Balanced candidate selection: preserves both large anchor amounts (closest to target)
+    and small fraction amounts (to fill remainder splits like 9900 + 50 + 50 = 10000).
+    """
+    if len(candidates) <= max_count:
+        return candidates
+    half = max_count // 2
+    closest = sorted(candidates, key=lambda c: abs(float(c[amount_key]) - target))[:half]
+    closest_ids = {id(c) for c in closest}
+    remaining = [c for c in candidates if id(c) not in closest_ids]
+    smallest = sorted(remaining, key=lambda c: float(c[amount_key]))[:(max_count - len(closest))]
+    return closest + smallest
 
 
 def run_phase3(
@@ -25,16 +41,10 @@ def run_phase3(
     Phase 3: Bounded subset-sum matching.
 
     Tries to find small subsets of unmatched Razorpay net amounts that sum
-    to an unmatched bank deposit.
-
-    Args:
-        unmatched_razorpay_nets: list of dicts with {settlement_id, net_amount, settlement_date, order_ids}
-        unmatched_bank_deposits: list of dicts with {utr_number, deposit_amount, deposit_date, description}
-
-    Returns:
-        matches: list of subset match dicts
-        still_unmatched: list of items that couldn't be matched
+    to an unmatched bank deposit (merged settlements), or subsets of bank deposits
+    that sum to a single settlement (split payouts).
     """
+    tolerance = float(getattr(config, "phase3_amount_tolerance", 2.0))
     matches = []
     matched_razorpay_ids = set()
     matched_bank_utrs = set()
@@ -70,16 +80,15 @@ def run_phase3(
                     if date_diff > DATE_WINDOW_DAYS:
                         continue
                 except (ValueError, TypeError):
-                    pass  # If date parsing fails, still consider the candidate
+                    pass  # If date parsing fails, skip or ignore
 
             candidates.append(rz)
 
         if not candidates:
             continue
 
-        # Prune candidates to the closest subset by amount
-        if len(candidates) > MAX_CANDIDATES:
-            candidates = sorted(candidates, key=lambda c: abs(c["net_amount"] - target))[:MAX_CANDIDATES]
+        # Prune candidates using balanced strategy (closest + smallest)
+        candidates = _prune_candidates(candidates, target, "net_amount", MAX_CANDIDATES)
 
         # Try combinations of size 1 to MAX_SUBSET_SIZE
         found = False
@@ -91,7 +100,14 @@ def run_phase3(
                 combo_total = sum(c["net_amount"] for c in combo)
                 diff = abs(combo_total - target)
 
-                if diff <= AMOUNT_TOLERANCE:
+                if diff <= tolerance:
+                    # Guard: If subset_size == 1, require narration match to prevent accidental false matches
+                    if subset_size == 1:
+                        cid = combo[0].get("id", combo[0].get("settlement_id", ""))
+                        desc = str(deposit.get("description", "")).lower()
+                        if str(cid).lower() not in desc:
+                            continue
+
                     # Found a match!
                     combo_ids = []
                     combo_orders = []
@@ -123,8 +139,6 @@ def run_phase3(
                     break
 
     # ── Direction 2: One settlement matched by multiple bank deposits ──────────
-    # This covers SPLIT_SETTLEMENT: bank splits one large payout into several deposits.
-    # Compute intermediate still-unmatched lists for Direction 2 to iterate over.
     still_unmatched_rz = [
         rz for rz in unmatched_razorpay_nets
         if rz.get("id", rz.get("settlement_id", "")) not in matched_razorpay_ids
@@ -168,9 +182,8 @@ def run_phase3(
         if not bank_candidates:
             continue
 
-        # Prune bank candidates to the closest subset
-        if len(bank_candidates) > MAX_CANDIDATES:
-            bank_candidates = sorted(bank_candidates, key=lambda c: abs(c["deposit_amount"] - target))[:MAX_CANDIDATES]
+        # Prune bank candidates using balanced strategy
+        bank_candidates = _prune_candidates(bank_candidates, target, "deposit_amount", MAX_CANDIDATES)
 
         # Try combinations of bank deposits that sum to the settlement
         found = False
@@ -180,7 +193,8 @@ def run_phase3(
             for combo in combinations(bank_candidates, subset_size):
                 combo_total = sum(c["deposit_amount"] for c in combo)
                 diff = abs(combo_total - target)
-                if diff <= AMOUNT_TOLERANCE:
+                if diff <= tolerance:
+
                     utrs = [c["utr_number"] for c in combo]
                     for utr in utrs:
                         matched_bank_utrs.add(utr)

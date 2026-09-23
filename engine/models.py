@@ -1,8 +1,9 @@
 """
 Data models and enums for the ReconX reconciliation engine.
 """
+from decimal import Decimal
 from enum import Enum
-from typing import Optional
+from typing import Optional, Union
 from pydantic import BaseModel
 from datetime import datetime, date
 
@@ -34,6 +35,9 @@ class AnomalyType(str, Enum):
     PARTIAL_REFUND = "PARTIAL_REFUND"
     SPLIT_SETTLEMENT = "SPLIT_SETTLEMENT"
     DUPLICATE_PAYMENT = "DUPLICATE_PAYMENT"
+    DUPLICATE_MERCHANT_ORDER = "DUPLICATE_MERCHANT_ORDER"
+    FAILED_ORDER = "FAILED_ORDER"
+    FAILED_PAYMENT = "FAILED_PAYMENT"
     MISSING_IN_RAZORPAY = "MISSING_IN_RAZORPAY"
     MISSING_IN_MERCHANT = "MISSING_IN_MERCHANT"
     AMOUNT_MISMATCH = "AMOUNT_MISMATCH"
@@ -61,20 +65,20 @@ class Confidence(str, Enum):
 
 class MerchantOrder(BaseModel):
     order_id: str
-    customer_name: str
-    amount: float
+    customer_name: Optional[str] = ""
+    amount: Union[Decimal, float]
     order_date: datetime
     status: str
-    product: str
+    product: Optional[str] = ""
 
 
 class RazorpayTransaction(BaseModel):
     payment_id: str
     order_id: str
-    amount: float
-    fee: float
-    tax: float
-    net_amount: float
+    amount: Union[Decimal, float]
+    fee: Union[Decimal, float]
+    tax: Union[Decimal, float]
+    net_amount: Union[Decimal, float]
     settlement_id: str
     payment_date: datetime
     settlement_date: date
@@ -83,10 +87,10 @@ class RazorpayTransaction(BaseModel):
 
 class BankDeposit(BaseModel):
     utr_number: str
-    deposit_amount: float
+    deposit_amount: Union[Decimal, float]
     deposit_date: date
     description: str
-    bank_ref: str
+    bank_ref: Optional[str] = ""
 
 
 class GroundTruth(BaseModel):
@@ -99,16 +103,17 @@ class GroundTruth(BaseModel):
 class MatchResult(BaseModel):
     """A single matched or flagged transaction."""
     order_id: str
-    merchant_amount: Optional[float] = None
-    razorpay_amount: Optional[float] = None
-    razorpay_net: Optional[float] = None
-    bank_deposit: Optional[float] = None
+    merchant_amount: Optional[Union[Decimal, float]] = None
+    razorpay_amount: Optional[Union[Decimal, float]] = None
+    razorpay_net: Optional[Union[Decimal, float]] = None
+    bank_deposit: Optional[Union[Decimal, float]] = None
     settlement_id: Optional[str] = None
     utr_number: Optional[str] = None
     status: MatchStatus
     phase: Optional[str] = None
     anomaly_type: Optional[str] = None
     note: Optional[str] = None
+
 
 
 class AnomalyDetail(BaseModel):

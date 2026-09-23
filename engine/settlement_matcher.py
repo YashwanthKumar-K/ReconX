@@ -11,13 +11,14 @@ from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Tuple
 
-AMOUNT_TOLERANCE = Decimal("1.00")   # ₹1 rounding tolerance (strict branch)
+from engine.config import config
+
 DATE_TOLERANCE_DAYS = 1              # ±1 day (strict branch)
-DESC_AMOUNT_TOLERANCE = Decimal("5.00")  # ₹5 looser tolerance on description branch
 DESC_DATE_TOLERANCE_DAYS = 7         # ±7 days gate on description branch (was unlimited)
 
 # Regex for exact settlement-ID token extraction from bank narration
 _SETL_TOKEN_RE = re.compile(r"\b(setl_[a-zA-Z0-9]+)\b", re.IGNORECASE)
+
 
 
 def _d(v) -> Decimal:
@@ -76,12 +77,33 @@ def run_phase2(
     matched_utr_numbers = set()
     matched_settlement_ids = set()
 
+    amount_tolerance = _d(getattr(config, "phase2_amount_tolerance", 1.0))
+    desc_amount_tolerance = amount_tolerance * Decimal("5")
+
     for setl_id, group in settlement_groups:
+        settlement_date = group["settlement_date"].iloc[0]
+        order_ids = group["order_id"].tolist()
+
+        # Guard against NaN/corrupt net amounts
+        if group["net_amount"].isna().any():
+            anomalies.append({
+                "order_id": f"SETTLEMENT_{setl_id}",
+                "anomaly_type": "REQUIRES_MANUAL_REVIEW",
+                "detected_in_phase": "Phase 2: Settlement Batch Matching",
+                "merchant_data": None,
+                "razorpay_data": {
+                    "settlement_id": str(setl_id),
+                    "transaction_count": len(order_ids),
+                    "order_ids": order_ids,
+                    "settlement_date": str(settlement_date),
+                },
+                "note": f"Settlement batch {setl_id} contains corrupt or NaN net_amount values.",
+            })
+            continue
+
         # Use Decimal sum to avoid float accumulation error across many rows
         net_sum = sum((_d(v) for v in group["net_amount"]), Decimal("0.00"))
         expected_total = net_sum.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        settlement_date = group["settlement_date"].iloc[0]
-        order_ids = group["order_id"].tolist()
 
         # Search bank statement for matching deposit
         best_match = None
@@ -108,21 +130,21 @@ def run_phase2(
 
             date_diff = abs((b_date - settlement_date).days) if b_date is not None and hasattr(b_date, "__sub__") else 999
 
-
             # Exact-token settlement-ID matching (not substring — avoids setl_001 ⊂ setl_0012)
             desc_text = str(b_row.get("description", ""))
             extracted_setls = set(_SETL_TOKEN_RE.findall(desc_text.lower()))
             desc_match = str(setl_id).lower() in extracted_setls
 
-            if amount_diff < AMOUNT_TOLERANCE and date_diff <= DATE_TOLERANCE_DAYS:
+            if amount_diff < amount_tolerance and date_diff <= DATE_TOLERANCE_DAYS:
                 if amount_diff < best_diff:
                     best_diff = amount_diff
                     best_match = b_row
-            elif desc_match and amount_diff < DESC_AMOUNT_TOLERANCE and date_diff <= DESC_DATE_TOLERANCE_DAYS:
+            elif desc_match and amount_diff < desc_amount_tolerance and date_diff <= DESC_DATE_TOLERANCE_DAYS:
                 # Description branch: looser amount tolerance BUT requires date gate
                 if amount_diff < best_diff:
                     best_diff = amount_diff
                     best_match = b_row
+
 
         if best_match is not None:
             note = None
