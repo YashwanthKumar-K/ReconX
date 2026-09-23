@@ -66,7 +66,7 @@ class Confidence(str, Enum):
 class MerchantOrder(BaseModel):
     order_id: str
     customer_name: Optional[str] = ""
-    amount: Union[Decimal, float]
+    amount: Decimal
     order_date: datetime
     status: str
     product: Optional[str] = ""
@@ -75,10 +75,10 @@ class MerchantOrder(BaseModel):
 class RazorpayTransaction(BaseModel):
     payment_id: str
     order_id: str
-    amount: Union[Decimal, float]
-    fee: Union[Decimal, float]
-    tax: Union[Decimal, float]
-    net_amount: Union[Decimal, float]
+    amount: Decimal
+    fee: Decimal
+    tax: Decimal
+    net_amount: Decimal
     settlement_id: str
     payment_date: datetime
     settlement_date: date
@@ -87,7 +87,7 @@ class RazorpayTransaction(BaseModel):
 
 class BankDeposit(BaseModel):
     utr_number: str
-    deposit_amount: Union[Decimal, float]
+    deposit_amount: Decimal
     deposit_date: date
     description: str
     bank_ref: Optional[str] = ""
@@ -103,16 +103,17 @@ class GroundTruth(BaseModel):
 class MatchResult(BaseModel):
     """A single matched or flagged transaction."""
     order_id: str
-    merchant_amount: Optional[Union[Decimal, float]] = None
-    razorpay_amount: Optional[Union[Decimal, float]] = None
-    razorpay_net: Optional[Union[Decimal, float]] = None
-    bank_deposit: Optional[Union[Decimal, float]] = None
+    merchant_amount: Optional[Decimal] = None
+    razorpay_amount: Optional[Decimal] = None
+    razorpay_net: Optional[Decimal] = None
+    bank_deposit: Optional[Decimal] = None
     settlement_id: Optional[str] = None
     utr_number: Optional[str] = None
     status: MatchStatus
     phase: Optional[str] = None
     anomaly_type: Optional[str] = None
     note: Optional[str] = None
+
 
 
 

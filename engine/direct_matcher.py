@@ -63,7 +63,7 @@ def run_phase1(
                 "anomaly_type": "DUPLICATE_MERCHANT_ORDER",
                 "detected_in_phase": "Phase 1: Direct Key Matching",
                 "merchant_data": {
-                    "amount": float(_d(m_row["amount"])),
+                    "amount": _d(m_row["amount"]),
                     "order_date": str(m_row["order_date"]),
                     "status": m_row.get("status", ""),
                     "product": m_row.get("product", ""),
@@ -83,7 +83,7 @@ def run_phase1(
                 "anomaly_type": "MISSING_RECORD",
                 "detected_in_phase": "Phase 1: Direct Key Matching",
                 "merchant_data": {
-                    "amount": float(m_row["amount"]),
+                    "amount": _d(m_row["amount"]),
                     "order_date": str(m_row["order_date"]),
                     "status": m_row.get("status", ""),
                     "product": m_row.get("product", ""),
@@ -105,7 +105,7 @@ def run_phase1(
                 "anomaly_type": "FAILED_ORDER",
                 "detected_in_phase": "Phase 1: Direct Key Matching",
                 "merchant_data": {
-                    "amount": float(m_row["amount"]),
+                    "amount": _d(m_row["amount"]),
                     "order_date": str(m_row["order_date"]),
                     "status": m_row.get("status", ""),
                     "product": m_row.get("product", ""),
@@ -131,7 +131,7 @@ def run_phase1(
                 "anomaly_type": "DUPLICATE_PAYMENT",
                 "detected_in_phase": "Phase 1: Direct Key Matching",
                 "merchant_data": {
-                    "amount": float(m_row["amount"]),
+                    "amount": _d(m_row["amount"]),
                     "order_date": str(m_row["order_date"]),
                     "status": m_row.get("status", ""),
                     "product": m_row.get("product", ""),
@@ -140,9 +140,9 @@ def run_phase1(
                 "razorpay_data": [
                     {
                         "payment_id": r["payment_id"],
-                        "amount": float(r["amount"]),
-                        "fee": float(r["fee"]),
-                        "net_amount": float(r["net_amount"]),
+                        "amount": _d(r["amount"]),
+                        "fee": _d(r["fee"]),
+                        "net_amount": _d(r["net_amount"]),
                         "payment_date": str(r["payment_date"]),
                     }
                     for r in rz_list
@@ -164,20 +164,21 @@ def run_phase1(
                 "anomaly_type": "REQUIRES_MANUAL_REVIEW",
                 "detected_in_phase": "Phase 1: Direct Key Matching",
                 "merchant_data": {
-                    "amount": "NaN/Corrupt" if _pd.isna(m_row["amount"]) else float(m_row["amount"]),
+                    "amount": "NaN/Corrupt" if _pd.isna(m_row["amount"]) else _d(m_row["amount"]),
                     "order_date": str(m_row["order_date"]),
                 },
                 "razorpay_data": {
                     "payment_id": rz_row["payment_id"],
-                    "amount": "NaN/Corrupt" if _pd.isna(rz_row["amount"]) else float(rz_row["amount"]),
-                    "fee": "NaN/Corrupt" if _pd.isna(rz_row["fee"]) else float(rz_row["fee"]),
-                    "net_amount": "NaN/Corrupt" if _pd.isna(rz_row["net_amount"]) else float(rz_row["net_amount"]),
+                    "amount": "NaN/Corrupt" if _pd.isna(rz_row["amount"]) else _d(rz_row["amount"]),
+                    "fee": "NaN/Corrupt" if _pd.isna(rz_row["fee"]) else _d(rz_row["fee"]),
+                    "net_amount": "NaN/Corrupt" if _pd.isna(rz_row["net_amount"]) else _d(rz_row["net_amount"]),
                 },
                 "note": "Corrupt or non-numeric data detected (NaN values). Cannot safely process.",
             })
             matched_merchant_ids.add(order_id)
             matched_razorpay_ids.add(rz_row["payment_id"])
             continue
+
 
         # ── Gateway payment status check ──────────────────────────────────
         # A Razorpay payment that failed or was refunded should not count as
@@ -189,13 +190,13 @@ def run_phase1(
                 "anomaly_type": "FAILED_PAYMENT",
                 "detected_in_phase": "Phase 1: Direct Key Matching",
                 "merchant_data": {
-                    "amount": float(m_row["amount"]),
+                    "amount": _d(m_row["amount"]),
                     "order_date": str(m_row["order_date"]),
                     "status": m_row.get("status", ""),
                 },
                 "razorpay_data": {
                     "payment_id": rz_row["payment_id"],
-                    "amount": float(rz_row["amount"]),
+                    "amount": _d(rz_row["amount"]),
                     "status": rz_row.get("status", ""),
                     "payment_date": str(rz_row["payment_date"]),
                 },
@@ -221,13 +222,12 @@ def run_phase1(
                 "anomaly_type": "AMOUNT_MISMATCH",
                 "detected_in_phase": "Phase 1: Direct Key Matching",
                 "merchant_data": {
-                    "amount": float(m_amount),
+                    "amount": m_amount,
                     "order_date": str(m_row["order_date"]),
                 },
                 "razorpay_data": {
                     "payment_id": rz_row["payment_id"],
-                    "amount": float(rz_amount),
-
+                    "amount": rz_amount,
                     "payment_date": str(rz_row["payment_date"]),
                 },
                 "note": f"Merchant amount ₹{m_row['amount']} ≠ Razorpay amount ₹{rz_row['amount']}.",
@@ -287,15 +287,15 @@ def run_phase1(
                 "anomaly_type": "FEE_DISCREPANCY",
                 "detected_in_phase": "Phase 1: Direct Key Matching",
                 "merchant_data": {
-                    "amount": float(m_amount),
+                    "amount": m_amount,
                     "order_date": str(m_row["order_date"]),
                 },
                 "razorpay_data": {
                     "payment_id": rz_row["payment_id"],
-                    "amount": float(rz_amount),
-                    "fee": float(actual_fee),
-                    "tax": float(actual_tax) if actual_tax is not None else None,
-                    "net_amount": float(_d(rz_row["net_amount"])),
+                    "amount": rz_amount,
+                    "fee": actual_fee,
+                    "tax": actual_tax if actual_tax is not None else None,
+                    "net_amount": _d(rz_row["net_amount"]),
                     "config.expected_fee_rate": config.expected_fee_rate,
                     "actual_fee_rate": round(actual_fee_rate, 4),
                 },
@@ -320,17 +320,17 @@ def run_phase1(
                 "anomaly_type": "PARTIAL_REFUND",
                 "detected_in_phase": "Phase 1: Direct Key Matching",
                 "merchant_data": {
-                    "amount": float(m_amount),
+                    "amount": m_amount,
                     "order_date": str(m_row["order_date"]),
                     "status": m_row.get("status", ""),
                 },
                 "razorpay_data": {
                     "payment_id": rz_row["payment_id"],
-                    "amount": float(rz_amount),
-                    "fee": float(actual_fee),
-                    "net_amount": float(actual_net),
-                    "expected_net": float(expected_net),
-                    "difference": float(net_diff),
+                    "amount": rz_amount,
+                    "fee": actual_fee,
+                    "net_amount": actual_net,
+                    "expected_net": expected_net,
+                    "difference": net_diff,
                     "settlement_id": rz_row["settlement_id"],
                     "payment_date": str(rz_row["payment_date"]),
                 },
@@ -342,8 +342,6 @@ def run_phase1(
             matched_merchant_ids.add(order_id)
             matched_razorpay_ids.add(rz_row["payment_id"])
             continue
-
-
 
         # Check for timing mismatch: order date and payment date on different days,
         # OR late-night order (after 11 PM) where settlement shifts by an extra day
@@ -382,13 +380,13 @@ def run_phase1(
                 "anomaly_type": "TIMING_MISMATCH",
                 "detected_in_phase": "Phase 1: Direct Key Matching",
                 "merchant_data": {
-                    "amount": float(m_row["amount"]),
+                    "amount": _d(m_row["amount"]),
                     "order_date": str(m_row["order_date"]),
                     "order_date_only": str(order_dt.date()),
                 },
                 "razorpay_data": {
                     "payment_id": rz_row["payment_id"],
-                    "amount": float(rz_row["amount"]),
+                    "amount": _d(rz_row["amount"]),
                     "payment_date": str(rz_row["payment_date"]),
                     "payment_date_only": str(payment_dt.date()),
                     "settlement_id": rz_row["settlement_id"],
@@ -403,9 +401,9 @@ def run_phase1(
         # Clean match
         matched.append({
             "order_id": order_id,
-            "merchant_amount": float(m_row["amount"]),
-            "razorpay_amount": float(rz_row["amount"]),
-            "razorpay_net": float(rz_row["net_amount"]),
+            "merchant_amount": _d(m_row["amount"]),
+            "razorpay_amount": _d(rz_row["amount"]),
+            "razorpay_net": _d(rz_row["net_amount"]),
             "settlement_id": rz_row["settlement_id"],
             "payment_id": rz_row["payment_id"],
             "status": "matched",
@@ -425,8 +423,8 @@ def run_phase1(
                     "merchant_data": None,
                     "razorpay_data": {
                         "payment_id": rz_row["payment_id"],
-                        "amount": float(rz_row["amount"]),
-                        "net_amount": float(rz_row["net_amount"]),
+                        "amount": _d(rz_row["amount"]),
+                        "net_amount": _d(rz_row["net_amount"]),
                         "payment_date": str(rz_row["payment_date"]),
                     },
                     "note": f"Razorpay payment {rz_row['payment_id']} has no matching merchant order.",
@@ -437,3 +435,4 @@ def run_phase1(
     unmatched_razorpay = razorpay_df[~razorpay_df["payment_id"].isin(matched_razorpay_ids)].copy()
 
     return matched, anomalies, unmatched_merchant, unmatched_razorpay
+

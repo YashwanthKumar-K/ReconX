@@ -153,8 +153,8 @@ def run_phase2(
 
             settlement_matches.append({
                 "settlement_id": str(setl_id),
-                "expected_amount": float(expected_total),
-                "bank_amount": float(_d(best_match["deposit_amount"])),
+                "expected_amount": expected_total,
+                "bank_amount": _d(best_match["deposit_amount"]),
                 "utr_number": best_match["utr_number"],
                 "settlement_date": str(settlement_date),
                 "deposit_date": str(best_match["deposit_date"]),
@@ -175,7 +175,7 @@ def run_phase2(
                 "merchant_data": None,
                 "razorpay_data": {
                     "settlement_id": str(setl_id),
-                    "expected_total": float(expected_total),
+                    "expected_total": expected_total,
                     "transaction_count": len(order_ids),
                     "order_ids": order_ids,
                     "settlement_date": str(settlement_date),
@@ -197,10 +197,11 @@ def run_phase2(
                 "razorpay_data": None,
                 "bank_data": {
                     "utr_number": b_row["utr_number"],
-                    "deposit_amount": float(_d(b_row["deposit_amount"])),
+                    "deposit_amount": _d(b_row["deposit_amount"]),
                     "deposit_date": str(b_row["deposit_date"]),
                     "description": b_row["description"],
                 },
+
                 "note": (
                     f"Bank deposit {b_row['utr_number']} (₹{b_row['deposit_amount']}) "
                     f"does not match any Razorpay settlement."

@@ -478,8 +478,9 @@ def save_ai_cache(anomalies: list[dict[str, Any]], cache_path: str) -> None:
         if a.get("ai_classification")
     ]
     with open(cache_path, "w", encoding="utf-8") as f:
-        json.dump(cacheable, f, indent=2)
+        json.dump(cacheable, f, indent=2, default=str)
     logger.info(f"Saved {len(cacheable)} AI results to cache: {cache_path}")
+
 
 
 def load_ai_cache(anomalies: list[dict[str, Any]], cache_path: str) -> list[dict[str, Any]]:

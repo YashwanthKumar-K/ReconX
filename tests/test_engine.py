@@ -358,3 +358,40 @@ def test_ai_cache_fingerprint_invalidation(tmp_path):
     # Cache should miss and fall back to rule-based fallback instead of returning stale explanation
     assert loaded[0]["ai_explanation"] != "Original explanation for 500 vs 600"
 
+
+def test_end_to_end_decimal_types():
+    from decimal import Decimal
+    from engine.models import MerchantOrder, RazorpayTransaction, BankDeposit, MatchResult
+
+    order = MerchantOrder(
+        order_id="ORD_DEC",
+        amount=Decimal("1499.50"),
+        order_date="2026-08-20T10:00:00",
+        status="completed",
+    )
+    assert isinstance(order.amount, Decimal)
+    assert order.amount == Decimal("1499.50")
+
+    merchant_df = pd.DataFrame([
+        {"order_id": "ORD_DEC_1", "amount": 1000.0, "order_date": "2026-08-20", "status": "completed"}
+    ])
+    razorpay_df = pd.DataFrame([{
+        "order_id": "ORD_DEC_1",
+        "payment_id": "pay_dec_1",
+        "amount": 1000.0,
+        "fee": 20.0,
+        "tax": 3.6,
+        "net_amount": 976.4,
+        "settlement_id": "setl_dec",
+        "payment_date": "2026-08-20",
+        "settlement_date": "2026-08-21",
+        "status": "captured",
+    }])
+    matched, _, _, _ = run_phase1(merchant_df, razorpay_df)
+    assert len(matched) == 1
+    # Verify outputs are Decimal instances
+    assert isinstance(matched[0]["merchant_amount"], Decimal)
+    assert isinstance(matched[0]["razorpay_amount"], Decimal)
+    assert isinstance(matched[0]["razorpay_net"], Decimal)
+
+

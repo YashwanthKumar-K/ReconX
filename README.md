@@ -13,8 +13,8 @@
     <img src="https://img.shields.io/badge/Python-3.11+-blue.svg" alt="Python 3.11+">
     <img src="https://img.shields.io/badge/Streamlit-1.40+-FF4B4B.svg" alt="Streamlit">
     <img src="https://img.shields.io/badge/AI%20Stack-Groq%20%7C%20NVIDIA%20NIM%20%7C%20Gemini-green.svg" alt="AI Stack">
-    <img src="https://img.shields.io/badge/Detection%20Accuracy-99.9%25-brightgreen.svg" alt="Detection Accuracy">
-    <img src="https://img.shields.io/badge/AI%20Diagnosis%20Accuracy-96.0%25-success.svg" alt="AI Accuracy">
+    <img src="https://img.shields.io/badge/Detection%20Accuracy-98.1%25-brightgreen.svg" alt="Detection Accuracy">
+    <img src="https://img.shields.io/badge/AI%20Diagnosis%20Accuracy-96.0%25%20(Benchmark)-success.svg" alt="AI Accuracy">
     <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
   </p>
 
@@ -22,6 +22,13 @@
 </div>
 
 > **Deterministic arithmetic matching for verifiable ledger validation (95%), paired with multi-provider LLM contextual reasoning for root-cause exception analysis (5%).**
+>
+> 🎯 **Accuracy Integrity & Benchmark Reconciliation:**
+> - **Engine Detection Accuracy (98.1%):** Measured deterministically on the reproducible 8,000-order benchmark suite (98.1%) and 100-order suite (98.0%–100.0%), replacing untraced theoretical estimates.
+> - **AI Diagnosis Accuracy:**
+>   - **96.0% (Injected Benchmark Suite):** Evaluated against controlled synthetic fault injections (`engine.synthetic_data_generator`) where ground-truth labels are explicitly known.
+>   - **86.0% (Real-World Upload Stress Test):** Evaluated on an unstructured 6,847-order merchant upload containing 1,663 edge cases (1,430/1,663 resolved accurately), reflecting real-world ambiguity and uncataloged merchant ledger idiosyncrasies.
+
 
 ReconX is a high-throughput financial reconciliation system engineered to validate, audit, and reconcile transactions across three disparate financial sources of truth: **Merchant ERP/Order Records**, **Razorpay Payment Gateway Ledgers**, and **Nodal Bank Statement Deposits**.
 
