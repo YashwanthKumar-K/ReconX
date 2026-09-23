@@ -467,8 +467,23 @@ if st.session_state.report is not None:
         ai_acc = report["scores"]["ai_accuracy"]
         ai_label = f"{ai_acc}%" if ai_acc is not None else "N/A"
         ai_delta = f"{report['scores']['ai_correct']}/{report['scores']['ai_total']}" if ai_acc is not None else None
-        st.metric("AI Accuracy", ai_label, delta=ai_delta,
-                  help="Only available when ground_truth.csv is present")
+        ai_only = report["scores"].get("ai_only_accuracy")
+        ai_only_total = report["scores"].get("ai_only_total", 0)
+        ai_only_str = (
+            f"{ai_only}% ({report['scores'].get('ai_only_correct', 0)}/{ai_only_total} real LLM calls)"
+            if ai_only_total > 0 else "N/A (no real LLM calls — deterministic fallback only)"
+        )
+        st.metric(
+            "AI Accuracy",
+            ai_label,
+            delta=ai_delta,
+            help=(
+                f"Combined (fallback + LLM): {ai_label}\n"
+                f"Real LLM only: {ai_only_str}\n"
+                f"Only available when ground_truth.csv is present."
+            ),
+        )
+
 
     st.markdown("---")
 
@@ -740,7 +755,7 @@ if st.session_state.report is not None:
                 fig_ai = go.Figure(go.Indicator(
                     mode="gauge+number",
                     value=scores.get("ai_accuracy", 0.0),
-                    title={"text": "AI Accuracy %"},
+                    title={"text": "AI Accuracy % (Combined)"},
                     gauge={
                         "axis": {"range": [0, 100]},
                         "bar": {"color": "#3b82f6"},
@@ -759,7 +774,15 @@ if st.session_state.report is not None:
                     margin=dict(l=20, r=20, t=40, b=20),
                 )
                 st.plotly_chart(fig_ai, width='stretch')
-                st.write(f"Correctly diagnosed: **{scores.get('ai_correct', 0)}/{scores.get('ai_total', 0)}** anomalies")
+                ai_only_acc = scores.get("ai_only_accuracy", 0.0)
+                ai_only_c = scores.get("ai_only_correct", 0)
+                ai_only_t = scores.get("ai_only_total", 0)
+                st.write(f"Combined (fallback + LLM): **{scores.get('ai_correct', 0)}/{scores.get('ai_total', 0)}** anomalies")
+                if ai_only_t > 0:
+                    st.write(f"🤖 Real LLM calls only: **{ai_only_c}/{ai_only_t}** ({ai_only_acc}%)")
+                else:
+                    st.caption("ℹ️ No real LLM calls made — all classifications used the deterministic fallback. Real LLM-only accuracy: N/A.")
+
 
             details = scores.get("ai_details", [])
             mismatches = [d for d in details if not d.get("correct", False)]

@@ -3,11 +3,25 @@ Phase 1: Direct Key Matching (Merchant ↔ Razorpay)
 
 Matches merchant orders to Razorpay transactions using order_id as the key.
 Also handles fee-rate discrepancy detection deterministically.
+Uses Python Decimal for all monetary comparisons to avoid binary float drift.
 """
 import pandas as pd
+from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 from typing import Tuple
 
 from engine.config import config
+
+# Razorpay gateway payment statuses that represent no money movement.
+# Orders/payments in these states must NOT be reconciled as settled.
+TERMINAL_STATUSES = frozenset({"failed", "refunded", "reversed", "expired"})
+
+
+def _d(value) -> Decimal:
+    """Convert a numeric value to Decimal with 2 decimal places (INR paise precision)."""
+    try:
+        return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except (InvalidOperation, TypeError):
+        return Decimal("0.00")
 
 
 def run_phase1(
@@ -59,6 +73,33 @@ def run_phase1(
             })
             matched_merchant_ids.add(order_id)
             continue
+
+        # ── Status-aware matching ──────────────────────────────────────────
+        # A merchant order in a terminal state (failed/refunded/etc.) should
+        # not silently pass as a clean reconciliation.  Flag it immediately.
+        m_status = str(m_row.get("status", "")).strip().lower()
+        if m_status in TERMINAL_STATUSES:
+            anomalies.append({
+                "order_id": order_id,
+                "anomaly_type": "FAILED_ORDER",
+                "detected_in_phase": "Phase 1: Direct Key Matching",
+                "merchant_data": {
+                    "amount": float(m_row["amount"]),
+                    "order_date": str(m_row["order_date"]),
+                    "status": m_row.get("status", ""),
+                    "product": m_row.get("product", ""),
+                    "customer_name": m_row.get("customer_name", ""),
+                },
+                "razorpay_data": None,
+                "note": (
+                    f"Order {order_id} has terminal status '{m_row.get('status', '')}' "
+                    f"in the merchant ledger — no money settled; skip reconciliation."
+                ),
+            })
+            matched_merchant_ids.add(order_id)
+            continue
+
+
 
         rz_list = rz_by_order[order_id]
 
@@ -117,8 +158,41 @@ def run_phase1(
             matched_razorpay_ids.add(rz_row["payment_id"])
             continue
 
-        # Amount check
-        amount_match = abs(float(m_row["amount"]) - float(rz_row["amount"])) < config.amount_tolerance
+        # ── Gateway payment status check ──────────────────────────────────
+        # A Razorpay payment that failed or was refunded should not count as
+        # settled — flag it so the analyst knows money never moved.
+        rz_status = str(rz_row.get("status", "")).strip().lower()
+        if rz_status in TERMINAL_STATUSES:
+            anomalies.append({
+                "order_id": order_id,
+                "anomaly_type": "FAILED_PAYMENT",
+                "detected_in_phase": "Phase 1: Direct Key Matching",
+                "merchant_data": {
+                    "amount": float(m_row["amount"]),
+                    "order_date": str(m_row["order_date"]),
+                    "status": m_row.get("status", ""),
+                },
+                "razorpay_data": {
+                    "payment_id": rz_row["payment_id"],
+                    "amount": float(rz_row["amount"]),
+                    "status": rz_row.get("status", ""),
+                    "payment_date": str(rz_row["payment_date"]),
+                },
+                "note": (
+                    f"Razorpay payment {rz_row['payment_id']} has status "
+                    f"'{rz_row.get('status', '')}' — funds were not captured. "
+                    f"Do not count as settled."
+                ),
+            })
+            matched_merchant_ids.add(order_id)
+            matched_razorpay_ids.add(rz_row["payment_id"])
+            continue
+
+        # ── Amount check (Decimal, ROUND_HALF_UP) ─────────────────────────
+        m_amount = _d(m_row["amount"])
+        rz_amount = _d(rz_row["amount"])
+        amount_tolerance = _d(config.amount_tolerance)
+        amount_match = abs(m_amount - rz_amount) < amount_tolerance
 
         if not amount_match:
             anomalies.append({
@@ -126,12 +200,13 @@ def run_phase1(
                 "anomaly_type": "AMOUNT_MISMATCH",
                 "detected_in_phase": "Phase 1: Direct Key Matching",
                 "merchant_data": {
-                    "amount": float(m_row["amount"]),
+                    "amount": float(m_amount),
                     "order_date": str(m_row["order_date"]),
                 },
                 "razorpay_data": {
                     "payment_id": rz_row["payment_id"],
-                    "amount": float(rz_row["amount"]),
+                    "amount": float(rz_amount),
+
                     "payment_date": str(rz_row["payment_date"]),
                 },
                 "note": f"Merchant amount ₹{m_row['amount']} ≠ Razorpay amount ₹{rz_row['amount']}.",
@@ -140,33 +215,48 @@ def run_phase1(
             matched_razorpay_ids.add(rz_row["payment_id"])
             continue
 
-        # Fee and tax check (deterministic — checks both MDR fee and GST tax)
-        actual_fee = float(rz_row["fee"])
-        actual_tax = float(rz_row.get("tax", 0)) if "tax" in rz_row and not _pd.isna(rz_row["tax"]) else 0.0
-        amount_val = float(rz_row["amount"])
-        
-        expected_fee = round(amount_val * config.expected_fee_rate, 2)
-        expected_tax = round(expected_fee * 0.18, 2)
-        
-        actual_fee_rate = actual_fee / amount_val if amount_val > 0 else 0
+        # ── Fee & tax check (Decimal — MDR 2% + GST 18% on fee) ──────────
+        actual_fee = _d(rz_row["fee"])
+        # tax=0 is NOT treated as a pass — it means a missing GST line (bug fix)
+        raw_tax = rz_row.get("tax", None)
+        tax_present = raw_tax is not None and not (_pd.isna(raw_tax) if hasattr(_pd, 'isna') else False)
+        actual_tax = _d(raw_tax) if tax_present else None
+
+        actual_fee_rate = float(actual_fee) / float(rz_amount) if float(rz_amount) > 0 else 0.0
+        expected_fee = (rz_amount * _d(config.expected_fee_rate)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        # GST threshold scales with order amount: max(₹0.50, 5% of expected tax) → never ±122% on small orders
+        expected_tax = (expected_fee * _d("0.18")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        tax_abs_threshold = max(_d("0.50"), (expected_tax * _d("0.05")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
         fee_rate_discrepancy = abs(actual_fee_rate - config.expected_fee_rate) > config.fee_rate_tolerance
-        tax_discrepancy = abs(actual_tax - expected_tax) > 0.50 if actual_tax > 0 else False
-        
+        if actual_tax is None:
+            # Missing GST line entirely — flag as discrepancy
+            tax_discrepancy = True
+            tax_missing = True
+        else:
+            tax_discrepancy = abs(actual_tax - expected_tax) > tax_abs_threshold
+            tax_missing = (actual_tax == _d("0.00"))
+
         fee_note = None
         fee_anomaly = fee_rate_discrepancy or tax_discrepancy
 
         if fee_anomaly:
-            if tax_discrepancy and not fee_rate_discrepancy:
+            if tax_missing:
                 fee_note = (
-                    f"GST Tax discrepancy: expected GST ~₹{expected_tax:.2f} (18% on ₹{actual_fee:.2f}), "
-                    f"actual GST ₹{actual_tax:.2f}. MDR rate is normal ({actual_fee_rate*100:.1f}%), "
+                    f"Missing GST: expected ₹{expected_tax} (18% on ₹{actual_fee}), "
+                    f"actual tax is zero/absent. This is a deterministic detection — no AI needed."
+                )
+            elif tax_discrepancy and not fee_rate_discrepancy:
+                fee_note = (
+                    f"GST Tax discrepancy: expected GST ~₹{expected_tax} (18% on ₹{actual_fee}), "
+                    f"actual GST ₹{actual_tax}. MDR rate is normal ({actual_fee_rate*100:.1f}%), "
                     f"but tax calculation deviates. This is a deterministic detection — no AI needed."
                 )
             else:
                 fee_note = (
                     f"Fee rate discrepancy: expected ~{config.expected_fee_rate*100:.1f}%, "
                     f"actual {actual_fee_rate*100:.2f}% "
-                    f"(₹{actual_fee} on ₹{amount_val}). "
+                    f"(₹{actual_fee} on ₹{rz_amount}). "
                     f"This is a deterministic detection — no AI needed."
                 )
 
@@ -176,15 +266,15 @@ def run_phase1(
                 "anomaly_type": "FEE_DISCREPANCY",
                 "detected_in_phase": "Phase 1: Direct Key Matching",
                 "merchant_data": {
-                    "amount": float(m_row["amount"]),
+                    "amount": float(m_amount),
                     "order_date": str(m_row["order_date"]),
                 },
                 "razorpay_data": {
                     "payment_id": rz_row["payment_id"],
-                    "amount": float(rz_row["amount"]),
-                    "fee": float(rz_row["fee"]),
-                    "tax": float(rz_row.get("tax", 0)),
-                    "net_amount": float(rz_row["net_amount"]),
+                    "amount": float(rz_amount),
+                    "fee": float(actual_fee),
+                    "tax": float(actual_tax) if actual_tax is not None else None,
+                    "net_amount": float(_d(rz_row["net_amount"])),
                     "config.expected_fee_rate": config.expected_fee_rate,
                     "actual_fee_rate": round(actual_fee_rate, 4),
                 },
@@ -195,39 +285,44 @@ def run_phase1(
             matched_razorpay_ids.add(rz_row["payment_id"])
             continue
 
-        # Check for partial refund: merchant amount matches but net is suspiciously low
-        expected_net = round(float(m_row["amount"]) * (1 - config.expected_fee_rate * (1 + 0.18)), 2)
-        actual_net = float(rz_row["net_amount"])
+        # ── Partial refund / net check (Decimal, unified formula) ────────
+        # Single definition: expected_net = amount × (1 − fee_rate × 1.18)
+        # Matches what direct_matcher checks (not the generator's per-field formula).
+        fee_factor = _d(config.expected_fee_rate) * _d("1.18")
+        expected_net = (m_amount * (Decimal("1") - fee_factor)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        actual_net = _d(rz_row["net_amount"])
         net_diff = abs(expected_net - actual_net)
 
-        if net_diff > 1.0:  # more than ₹1 difference in net
+        if net_diff > _d("1.00"):  # more than ₹1 difference in net
             anomalies.append({
                 "order_id": order_id,
                 "anomaly_type": "PARTIAL_REFUND",
                 "detected_in_phase": "Phase 1: Direct Key Matching",
                 "merchant_data": {
-                    "amount": float(m_row["amount"]),
+                    "amount": float(m_amount),
                     "order_date": str(m_row["order_date"]),
-                    "status": m_row["status"],
+                    "status": m_row.get("status", ""),
                 },
                 "razorpay_data": {
                     "payment_id": rz_row["payment_id"],
-                    "amount": float(rz_row["amount"]),
-                    "fee": float(rz_row["fee"]),
-                    "net_amount": actual_net,
-                    "expected_net": expected_net,
-                    "difference": round(net_diff, 2),
+                    "amount": float(rz_amount),
+                    "fee": float(actual_fee),
+                    "net_amount": float(actual_net),
+                    "expected_net": float(expected_net),
+                    "difference": float(net_diff),
                     "settlement_id": rz_row["settlement_id"],
                     "payment_date": str(rz_row["payment_date"]),
                 },
                 "note": (
-                    f"Net amount ₹{actual_net} is ₹{round(net_diff, 2)} less than expected ₹{expected_net}. "
+                    f"Net amount ₹{actual_net} is ₹{net_diff} less than expected ₹{expected_net}. "
                     f"Possible partial refund."
                 ),
             })
             matched_merchant_ids.add(order_id)
             matched_razorpay_ids.add(rz_row["payment_id"])
             continue
+
+
 
         # Check for timing mismatch: order date and payment date on different days,
         # OR late-night order (after 11 PM) where settlement shifts by an extra day

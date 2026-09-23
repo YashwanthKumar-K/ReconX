@@ -75,7 +75,7 @@ def run_reconciliation(
     if verbose:
         print("\n[3/5] Phase 2: Settlement Batch Matching...")
     p2_matches, p2_anomalies, unmatched_bank = run_phase2(
-        razorpay_df, bank_df, p1_matched
+        razorpay_df, bank_df, p1_anomalies
     )
     p2_stats = {
         "phase_name": "Phase 2: Settlement Batch Matching",
