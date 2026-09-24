@@ -389,6 +389,25 @@ if data_dir or "data_dir" in st.session_state:
 
         progress_bar = st.progress(0, text="Starting reconciliation...")
 
+        # Ensure fresh engine modules are loaded even if Streamlit has cached previous imports in memory
+        import importlib
+        for mod_name in [
+            "engine.config",
+            "engine.models",
+            "engine.csv_parser",
+            "engine.direct_matcher",
+            "engine.settlement_matcher",
+            "engine.graph_matcher",
+            "engine.scorer",
+            "engine.ai_investigator",
+            "engine.reconciliation_engine",
+        ]:
+            if mod_name in sys.modules:
+                try:
+                    importlib.reload(sys.modules[mod_name])
+                except Exception:
+                    pass
+
         from engine.reconciliation_engine import run_reconciliation
         from engine.csv_parser import CSVValidationError
 
@@ -405,6 +424,9 @@ if data_dir or "data_dir" in st.session_state:
         except Exception as e:
             progress_bar.empty()
             st.error(f"🚨 **Unexpected Error:** {str(e)}")
+            with st.expander("🔍 Show Technical Error Traceback", expanded=True):
+                import traceback
+                st.code(traceback.format_exc())
             st.session_state.running = False
             st.stop()
 

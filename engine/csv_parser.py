@@ -29,12 +29,21 @@ def _parse_dates(series: pd.Series) -> pd.Series:
     is_dmy = s.str.match(_DMY_DATE_RE)
     result = pd.Series(pd.NaT, index=series.index, dtype="datetime64[ns]")
     if is_iso.any():
-        result[is_iso] = pd.to_datetime(s[is_iso], format="mixed", dayfirst=False)
+        iso_dates = pd.to_datetime(s[is_iso], format="mixed", dayfirst=False)
+        if hasattr(iso_dates.dt, "tz") and iso_dates.dt.tz is not None:
+            iso_dates = iso_dates.dt.tz_localize(None)
+        result[is_iso] = iso_dates
     if is_dmy.any():
-        result[is_dmy] = pd.to_datetime(s[is_dmy], format="mixed", dayfirst=True)
+        dmy_dates = pd.to_datetime(s[is_dmy], format="mixed", dayfirst=True)
+        if hasattr(dmy_dates.dt, "tz") and dmy_dates.dt.tz is not None:
+            dmy_dates = dmy_dates.dt.tz_localize(None)
+        result[is_dmy] = dmy_dates
     rest = ~(is_iso | is_dmy)
     if rest.any():
-        result[rest] = pd.to_datetime(s[rest], format="mixed", dayfirst=False)
+        rest_dates = pd.to_datetime(s[rest], format="mixed", dayfirst=False)
+        if hasattr(rest_dates.dt, "tz") and rest_dates.dt.tz is not None:
+            rest_dates = rest_dates.dt.tz_localize(None)
+        result[rest] = rest_dates
     return result
 
 

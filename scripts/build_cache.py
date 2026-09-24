@@ -1,4 +1,4 @@
-﻿from engine.reconciliation_engine import run_reconciliation
+from engine.reconciliation_engine import run_reconciliation
 from engine.ai_investigator import save_ai_cache
 
 report = run_reconciliation('data/generated_8000', use_ai=False, verbose=False)
