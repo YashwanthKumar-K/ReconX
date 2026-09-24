@@ -124,7 +124,10 @@ def test_phase1_fee_and_tax_discrepancies():
     assert len(anomalies_fee) == 1
     assert anomalies_fee[0]["anomaly_type"] == "FEE_DISCREPANCY"
 
-    # Test abnormal GST tax
+    # Test abnormal GST tax with standard fee: the net is short, so under the
+    # check ordering (fee rate → net/refund → tax) this is a PARTIAL_REFUND —
+    # a standard 2% fee plus a reduced net means money was deducted post-fee,
+    # even when the tax line itself looks unusual.
     razorpay_df_bad_tax = pd.DataFrame([{
         "order_id": "ORD_FEE",
         "payment_id": "pay_FEE",
@@ -139,7 +142,26 @@ def test_phase1_fee_and_tax_discrepancies():
     }])
     _, anomalies_tax, _, _ = run_phase1(merchant_df, razorpay_df_bad_tax)
     assert len(anomalies_tax) == 1
-    assert anomalies_tax[0]["anomaly_type"] == "FEE_DISCREPANCY"
+    assert anomalies_tax[0]["anomaly_type"] == "PARTIAL_REFUND"
+
+    # Test missing GST line: tax=0 inflates the net above expected, so the
+    # (short-only) refund check is skipped and this stays FEE_DISCREPANCY.
+    razorpay_df_no_tax = pd.DataFrame([{
+        "order_id": "ORD_FEE",
+        "payment_id": "pay_FEE",
+        "settlement_id": "setl_001",
+        "amount": 1000.0,
+        "fee": 20.0,  # standard 2%
+        "tax": 0.0,  # missing GST line
+        "net_amount": 980.0,
+        "payment_date": "2026-08-20 10:01:00",
+        "settlement_date": "2026-08-21",
+        "status": "captured",
+    }])
+    _, anomalies_no_tax, _, _ = run_phase1(merchant_df, razorpay_df_no_tax)
+    assert len(anomalies_no_tax) == 1
+    assert anomalies_no_tax[0]["anomaly_type"] == "FEE_DISCREPANCY"
+
 
 
 def test_phase1_partial_refund():
@@ -223,6 +245,32 @@ def test_phase3_subset_sum():
     assert matches[0]["matched_total"] == 5000.0
     assert matches[0]["bank_utr"] == "UTR_COMBINED"
     assert len(matches[0]["matched_settlements"]) == 2
+
+
+def test_phase3_prune_candidates_decimal():
+    """Verify that _prune_candidates handles Decimal targets and candidates (>15 items) without TypeError."""
+    from decimal import Decimal
+    # Create 20 unmatched nets (> MAX_CANDIDATES = 15) with Decimal net amounts
+    unmatched_nets = [
+        {
+            "id": f"setl_{i}",
+            "settlement_id": f"setl_{i}",
+            "net_amount": Decimal(f"{1000 + i * 50}.00"),
+            "settlement_date": "2026-08-20",
+        }
+        for i in range(20)
+    ]
+    unmatched_bank = [{
+        "utr_number": "UTR_TEST_PRUNE",
+        "deposit_amount": Decimal("2050.00"),  # setl_0 (1000) + setl_1 (1050)
+        "deposit_date": "2026-08-20",
+        "description": "BATCH DEPOSIT",
+    }]
+
+    matches, still_unmatched = run_phase3(unmatched_nets, unmatched_bank)
+    assert len(matches) == 1
+    assert matches[0]["matched_total"] == Decimal("2050.00")
+    assert matches[0]["bank_utr"] == "UTR_TEST_PRUNE"
 
 
 # ─── Scorer Tests (Phase 5) ──────────────────────────────────────────────────

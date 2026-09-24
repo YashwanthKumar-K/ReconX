@@ -10,6 +10,7 @@ import pandas as pd
 from datetime import timedelta
 from itertools import combinations
 from typing import Tuple
+from decimal import Decimal, ROUND_HALF_UP
 
 from engine.config import config
 
@@ -18,7 +19,15 @@ DATE_WINDOW_DAYS = 2  # Only consider items within ±2 days
 MAX_CANDIDATES = 15  # Prune candidates to avoid combinatorial explosion
 
 
-def _prune_candidates(candidates: list[dict], target: float, amount_key: str, max_count: int) -> list[dict]:
+def _d(v) -> Decimal:
+    """Convert numeric value to Decimal with 2 dp (ROUND_HALF_UP)."""
+    try:
+        return Decimal(str(v)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except Exception:
+        return Decimal("0.00")
+
+
+def _prune_candidates(candidates: list[dict], target, amount_key: str, max_count: int) -> list[dict]:
     """
     Balanced candidate selection: preserves both large anchor amounts (closest to target)
     and small fraction amounts (to fill remainder splits like 9900 + 50 + 50 = 10000).
@@ -26,10 +35,11 @@ def _prune_candidates(candidates: list[dict], target: float, amount_key: str, ma
     if len(candidates) <= max_count:
         return candidates
     half = max_count // 2
-    closest = sorted(candidates, key=lambda c: abs(float(c[amount_key]) - target))[:half]
+    target_d = _d(target)
+    closest = sorted(candidates, key=lambda c: abs(_d(c[amount_key]) - target_d))[:half]
     closest_ids = {id(c) for c in closest}
     remaining = [c for c in candidates if id(c) not in closest_ids]
-    smallest = sorted(remaining, key=lambda c: float(c[amount_key]))[:(max_count - len(closest))]
+    smallest = sorted(remaining, key=lambda c: _d(c[amount_key]))[:(max_count - len(closest))]
     return closest + smallest
 
 
@@ -44,19 +54,19 @@ def run_phase3(
     to an unmatched bank deposit (merged settlements), or subsets of bank deposits
     that sum to a single settlement (split payouts).
     """
-    tolerance = float(getattr(config, "phase3_amount_tolerance", 2.0))
+    tolerance = _d(getattr(config, "phase3_amount_tolerance", 2.0))
     matches = []
     matched_razorpay_ids = set()
     matched_bank_utrs = set()
 
     # Sort deposits descending — try to match largest first
-    sorted_deposits = sorted(unmatched_bank_deposits, key=lambda x: x["deposit_amount"], reverse=True)
+    sorted_deposits = sorted(unmatched_bank_deposits, key=lambda x: _d(x["deposit_amount"]), reverse=True)
 
     for deposit in sorted_deposits:
         if deposit["utr_number"] in matched_bank_utrs:
             continue
 
-        target = deposit["deposit_amount"]
+        target = _d(deposit["deposit_amount"])
         deposit_date = deposit["deposit_date"]
 
         # Filter candidates by date window
@@ -97,7 +107,7 @@ def run_phase3(
                 break
 
             for combo in combinations(candidates, subset_size):
-                combo_total = sum(c["net_amount"] for c in combo)
+                combo_total = sum((_d(c["net_amount"]) for c in combo), Decimal("0.00"))
                 diff = abs(combo_total - target)
 
                 if diff <= tolerance:
@@ -122,16 +132,16 @@ def run_phase3(
                         "bank_utr": deposit["utr_number"],
                         "bank_amount": target,
                         "matched_settlements": combo_ids,
-                        "matched_total": round(combo_total, 2),
-                        "difference": round(diff, 2),
+                        "matched_total": combo_total,
+                        "difference": diff,
                         "order_ids": combo_orders,
                         "subset_size": subset_size,
                         "status": "matched",
                         "phase": "Phase 3: Fuzzy/Subset-Sum Matching",
                         "note": (
-                            f"Matched bank deposit {deposit['utr_number']} (Rs.{target}) "
-                            f"to {subset_size} settlement(s) totaling Rs.{round(combo_total, 2)} "
-                            f"(diff: Rs.{round(diff, 2)})."
+                            f"Matched bank deposit {deposit['utr_number']} (₹{target}) "
+                            f"to {subset_size} settlement(s) totaling ₹{combo_total} "
+                            f"(diff: ₹{diff})."
                         ),
                     })
                     matched_bank_utrs.add(deposit["utr_number"])
@@ -153,7 +163,7 @@ def run_phase3(
         if rz_id in matched_razorpay_ids:
             continue
 
-        target = rz["net_amount"]
+        target = _d(rz["net_amount"])
         rz_date = rz.get("settlement_date")
 
         # Filter unmatched bank deposits by date window
@@ -191,7 +201,7 @@ def run_phase3(
             if found:
                 break
             for combo in combinations(bank_candidates, subset_size):
-                combo_total = sum(c["deposit_amount"] for c in combo)
+                combo_total = sum((_d(c["deposit_amount"]) for c in combo), Decimal("0.00"))
                 diff = abs(combo_total - target)
                 if diff <= tolerance:
 
@@ -204,16 +214,16 @@ def run_phase3(
                         "settlement_id": rz_id,
                         "settlement_amount": target,
                         "matched_deposits": utrs,
-                        "matched_total": round(combo_total, 2),
-                        "difference": round(diff, 2),
+                        "matched_total": combo_total,
+                        "difference": diff,
                         "order_ids": rz.get("order_ids", []),
                         "subset_size": subset_size,
                         "status": "matched",
                         "phase": "Phase 3: Fuzzy/Subset-Sum Matching",
                         "note": (
-                            f"Settlement {rz_id} (Rs.{target}) matched by {subset_size} "
-                            f"bank deposits totaling Rs.{round(combo_total, 2)} "
-                            f"(diff: Rs.{round(diff, 2)}). This is a SPLIT_SETTLEMENT."
+                            f"Settlement {rz_id} (₹{target}) matched by {subset_size} "
+                            f"bank deposits totaling ₹{combo_total} "
+                            f"(diff: ₹{diff}). This is a SPLIT_SETTLEMENT."
                         ),
                     })
                     found = True

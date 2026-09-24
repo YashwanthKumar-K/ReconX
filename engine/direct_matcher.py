@@ -237,6 +237,7 @@ def run_phase1(
             continue
 
         # ── Fee & tax check (Decimal — MDR 2% + GST 18% on fee) ──────────
+        # ── Fee / tax values (Decimal — MDR 2% + GST 18% on fee) ─────────
         actual_fee = _d(rz_row["fee"])
         # tax=0 is NOT treated as a pass — it means a missing GST line (bug fix)
         raw_tax = rz_row.get("tax", None)
@@ -258,30 +259,100 @@ def run_phase1(
             tax_discrepancy = abs(actual_tax - expected_tax) > tax_abs_threshold
             tax_missing = (actual_tax == _d("0.00"))
 
-        fee_note = None
-        fee_anomaly = fee_rate_discrepancy or tax_discrepancy
+        # ── Check 1: fee rate ────────────────────────────────────────────
+        # If the gateway charged the wrong MDR, the net-vs-standard-formula
+        # comparison is meaningless, so this stays FEE_DISCREPANCY and the
+        # refund check below is skipped.
+        if fee_rate_discrepancy:
+            anomalies.append({
+                "order_id": order_id,
+                "anomaly_type": "FEE_DISCREPANCY",
+                "detected_in_phase": "Phase 1: Direct Key Matching",
+                "merchant_data": {
+                    "amount": m_amount,
+                    "order_date": str(m_row["order_date"]),
+                },
+                "razorpay_data": {
+                    "payment_id": rz_row["payment_id"],
+                    "amount": rz_amount,
+                    "fee": actual_fee,
+                    "tax": actual_tax if actual_tax is not None else None,
+                    "net_amount": _d(rz_row["net_amount"]),
+                    "config.expected_fee_rate": config.expected_fee_rate,
+                    "actual_fee_rate": round(actual_fee_rate, 4),
+                },
+                "note": (
+                    f"Fee rate discrepancy: expected ~{config.expected_fee_rate*100:.1f}%, "
+                    f"actual {actual_fee_rate*100:.2f}% "
+                    f"(₹{actual_fee} on ₹{rz_amount}). "
+                    f"This is a deterministic detection — no AI needed."
+                ),
+            })
+            # Still mark as matched (fee discrepancy is noted, not unmatched)
+            matched_merchant_ids.add(order_id)
+            matched_razorpay_ids.add(rz_row["payment_id"])
+            continue
 
-        if fee_anomaly:
+        # ── Check 2: partial refund / net (Decimal, unified formula) ─────
+        # Runs BEFORE the tax check: when the MDR fee is standard (2%) but
+        # the net amount is short, money was deducted after fees — a partial
+        # refund — even if the tax line itself looks unusual. (Previously the
+        # tax check ran first and mislabeled such orders FEE_DISCREPANCY,
+        # and its `continue` skipped this check entirely.)
+        # Single definition: expected_net = amount × (1 − fee_rate × 1.18)
+        fee_factor = _d(config.expected_fee_rate) * _d("1.18")
+        expected_net = (m_amount * (Decimal("1") - fee_factor)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        actual_net = _d(rz_row["net_amount"])
+        # Directional: only a SHORT net indicates a refund. A net HIGHER than
+        # expected (e.g. missing/zero GST inflates the net) falls through to
+        # the tax check below, preserving missing-GST → FEE_DISCREPANCY.
+        net_short = expected_net - actual_net
+
+        if net_short > _d("1.00"):  # net more than ₹1 below expected
+            anomalies.append({
+                "order_id": order_id,
+                "anomaly_type": "PARTIAL_REFUND",
+                "detected_in_phase": "Phase 1: Direct Key Matching",
+                "merchant_data": {
+                    "amount": m_amount,
+                    "order_date": str(m_row["order_date"]),
+                    "status": m_row.get("status", ""),
+                },
+                "razorpay_data": {
+                    "payment_id": rz_row["payment_id"],
+                    "amount": rz_amount,
+                    "fee": actual_fee,
+                    "net_amount": actual_net,
+                    "expected_net": expected_net,
+                    "difference": net_short,
+                    "settlement_id": rz_row["settlement_id"],
+                    "payment_date": str(rz_row["payment_date"]),
+                },
+                "note": (
+                    f"Net amount ₹{actual_net} is ₹{net_short} less than expected ₹{expected_net}. "
+                    f"Possible partial refund."
+                ),
+            })
+            matched_merchant_ids.add(order_id)
+            matched_razorpay_ids.add(rz_row["payment_id"])
+            continue
+
+        # ── Check 3: tax ─────────────────────────────────────────────────
+        # Reached only with a standard fee rate AND a consistent net amount:
+        # a deviant or missing tax line here is a genuine tax discrepancy,
+        # not a refund.
+        if tax_discrepancy:
             if tax_missing:
                 fee_note = (
                     f"Missing GST: expected ₹{expected_tax} (18% on ₹{actual_fee}), "
                     f"actual tax is zero/absent. This is a deterministic detection — no AI needed."
                 )
-            elif tax_discrepancy and not fee_rate_discrepancy:
+            else:
                 fee_note = (
                     f"GST Tax discrepancy: expected GST ~₹{expected_tax} (18% on ₹{actual_fee}), "
                     f"actual GST ₹{actual_tax}. MDR rate is normal ({actual_fee_rate*100:.1f}%), "
                     f"but tax calculation deviates. This is a deterministic detection — no AI needed."
                 )
-            else:
-                fee_note = (
-                    f"Fee rate discrepancy: expected ~{config.expected_fee_rate*100:.1f}%, "
-                    f"actual {actual_fee_rate*100:.2f}% "
-                    f"(₹{actual_fee} on ₹{rz_amount}). "
-                    f"This is a deterministic detection — no AI needed."
-                )
-
-        if fee_anomaly:
             anomalies.append({
                 "order_id": order_id,
                 "anomaly_type": "FEE_DISCREPANCY",
@@ -306,42 +377,6 @@ def run_phase1(
             matched_razorpay_ids.add(rz_row["payment_id"])
             continue
 
-        # ── Partial refund / net check (Decimal, unified formula) ────────
-        # Single definition: expected_net = amount × (1 − fee_rate × 1.18)
-        # Matches what direct_matcher checks (not the generator's per-field formula).
-        fee_factor = _d(config.expected_fee_rate) * _d("1.18")
-        expected_net = (m_amount * (Decimal("1") - fee_factor)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        actual_net = _d(rz_row["net_amount"])
-        net_diff = abs(expected_net - actual_net)
-
-        if net_diff > _d("1.00"):  # more than ₹1 difference in net
-            anomalies.append({
-                "order_id": order_id,
-                "anomaly_type": "PARTIAL_REFUND",
-                "detected_in_phase": "Phase 1: Direct Key Matching",
-                "merchant_data": {
-                    "amount": m_amount,
-                    "order_date": str(m_row["order_date"]),
-                    "status": m_row.get("status", ""),
-                },
-                "razorpay_data": {
-                    "payment_id": rz_row["payment_id"],
-                    "amount": rz_amount,
-                    "fee": actual_fee,
-                    "net_amount": actual_net,
-                    "expected_net": expected_net,
-                    "difference": net_diff,
-                    "settlement_id": rz_row["settlement_id"],
-                    "payment_date": str(rz_row["payment_date"]),
-                },
-                "note": (
-                    f"Net amount ₹{actual_net} is ₹{net_diff} less than expected ₹{expected_net}. "
-                    f"Possible partial refund."
-                ),
-            })
-            matched_merchant_ids.add(order_id)
-            matched_razorpay_ids.add(rz_row["payment_id"])
-            continue
 
         # Check for timing mismatch: order date and payment date on different days,
         # OR late-night order (after 11 PM) where settlement shifts by an extra day

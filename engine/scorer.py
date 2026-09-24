@@ -128,27 +128,45 @@ def score_results(
         )
 
         if is_settlement_level:
+            anomaly_type = a.get("anomaly_type", "")
             rz_data = a.get("razorpay_data", {})
             sub_order_ids = []
             if isinstance(rz_data, dict):
-                sub_order_ids = rz_data.get("order_ids", [])
+                sub_order_ids = rz_data.get("order_ids", []) or []
 
-            if sub_order_ids:
-                for sub_oid in sub_order_ids:
-                    if gt_dict.get(sub_oid) == "SPLIT_SETTLEMENT":
-                        gt_type = "SPLIT_SETTLEMENT"
-                        break
-            else:
-                gt_type = a.get("anomaly_type", "")
-                if gt_type == "NONE" or not gt_type:
-                    continue
+            # Ground truth is order-level, so a batch/bank-level anomaly can
+            # only be verified through its underlying orders.
+            sub_gts = {gt_dict.get(o) for o in sub_order_ids if o in gt_dict}
+            real_sub_gts = {g for g in sub_gts if g and g != "NONE"}
+
+            if anomaly_type == "ORPHAN_DEPOSIT" or not sub_order_ids:
+                # Bank-side orphan with no underlying orders: the order-level
+                # answer key has no label for it. Scoring it against its own
+                # anomaly label is circular (trivially "correct"), so it is
+                # excluded from AI accuracy — neither correct nor wrong.
+                continue
+
+            if not real_sub_gts:
+                # Every underlying order is clean per ground truth, so the
+                # batch flag is unverifiable at order level (a possible
+                # detection false positive, which engine accuracy already
+                # penalizes via sub-order counting). Excluded from AI accuracy.
+                continue
+
+            # The batch contains >=1 genuinely anomalous order, so the
+            # settlement-level flag is verified. The answer key has no
+            # batch-level labels, so the AI is correct when it names the
+            # settlement phenomenon or matches an underlying order's type.
+            normalized_ai = AI_TO_GROUND_TRUTH_MAP.get(ai_class, ai_class)
+            acceptable = set(real_sub_gts) | {"SETTLEMENT_MISMATCH", "SPLIT_SETTLEMENT", "ORPHAN_DEPOSIT"}
+            acceptable_norm = {AI_TO_GROUND_TRUTH_MAP.get(t, t) for t in acceptable}
+            is_correct = normalized_ai in acceptable_norm or ai_class in acceptable
+            gt_type = "+".join(sorted(real_sub_gts))
 
             ai_total += 1
             if is_real_ai:
                 ai_only_total += 1
-                
-            normalized_ai = AI_TO_GROUND_TRUTH_MAP.get(ai_class, ai_class)
-            is_correct = (normalized_ai == gt_type) or (ai_class == gt_type) or (gt_type == "ORPHAN_DEPOSIT" and normalized_ai in ("ORPHAN_DEPOSIT", "MISSING_RECORD"))
+
             if is_correct:
                 ai_correct += 1
                 if is_real_ai:
@@ -165,6 +183,7 @@ def score_results(
                 "explanation": a.get("ai_explanation") or a.get("note", ""),
             })
             continue
+
 
         else:
             if oid not in gt_dict:
